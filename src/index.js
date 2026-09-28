@@ -1,10 +1,23 @@
-// Cloudflare Pages Function: proxies the Ambient Weather API so the API key
-// and application key never reach the browser. Set AMBIENT_API_KEY,
-// AMBIENT_APPLICATION_KEY, and AMBIENT_MAC_ADDRESS as environment variables
-// (Pages project settings, or .dev.vars locally) — never commit them.
+// Worker entry point: serves the static dashboard from the assets binding and
+// proxies /api/current to Ambient Weather, so the API key and application key
+// never reach the browser. Set AMBIENT_API_KEY, AMBIENT_APPLICATION_KEY, and
+// AMBIENT_MAC_ADDRESS as Worker environment variables/secrets (dashboard, or
+// .dev.vars locally) — never commit them.
 
-export async function onRequestGet(context) {
-    const { AMBIENT_API_KEY, AMBIENT_APPLICATION_KEY, AMBIENT_MAC_ADDRESS } = context.env;
+export default {
+    async fetch(request, env) {
+        const url = new URL(request.url);
+
+        if (url.pathname === "/api/current") {
+            return handleCurrent(env);
+        }
+
+        return env.ASSETS.fetch(request);
+    },
+};
+
+async function handleCurrent(env) {
+    const { AMBIENT_API_KEY, AMBIENT_APPLICATION_KEY, AMBIENT_MAC_ADDRESS } = env;
 
     if (!AMBIENT_API_KEY || !AMBIENT_APPLICATION_KEY || !AMBIENT_MAC_ADDRESS) {
         return jsonResponse({ error: "Server is missing Ambient Weather credentials." }, 500);
@@ -15,13 +28,13 @@ export async function onRequestGet(context) {
     // historical-data endpoint (for graphs) and can come back empty if the
     // station hasn't reported within its retention window, even though the
     // device itself still has a valid last reading.
-    const url = new URL("https://api.ambientweather.net/v1/devices");
-    url.searchParams.set("apiKey", AMBIENT_API_KEY);
-    url.searchParams.set("applicationKey", AMBIENT_APPLICATION_KEY);
+    const upstreamUrl = new URL("https://api.ambientweather.net/v1/devices");
+    upstreamUrl.searchParams.set("apiKey", AMBIENT_API_KEY);
+    upstreamUrl.searchParams.set("applicationKey", AMBIENT_APPLICATION_KEY);
 
     let upstream;
     try {
-        upstream = await fetch(url);
+        upstream = await fetch(upstreamUrl);
     } catch (err) {
         return jsonResponse({ error: "Failed to reach Ambient Weather." }, 502);
     }

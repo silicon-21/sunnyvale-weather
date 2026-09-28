@@ -2,7 +2,8 @@
   "name": "sunnyvale-weather",
   "private": true,
   "scripts": {
-    "dev": "wrangler pages dev . --compatibility-date=2026-09-27"
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
   },
   "devDependencies": {
     "wrangler": "^4.142.0"
