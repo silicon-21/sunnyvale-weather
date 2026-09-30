@@ -1,10 +1,11 @@
 const REFRESH_INTERVAL_MS = 60_000;
 const STALE_AFTER_MS = 15 * 60_000;
-const SHEETS_API_URL = "https://script.google.com/macros/s/AKfycbw0LodV_rPSxFXvf1jOOE-oYzU4jJq_-RagrsP8VMAbDmnMdNBf5PaHnf39GRt5dCN-4g/exec";
+const SHEET_RAIN_REFRESH_INTERVAL_MS = 60 * 60_000;
+const SHEET_RAIN_RETRY_DELAY_MS = 30_000;
 
 // Visual scale caps for the rain jars — not measured maxima, just what reads
-// as "nearly full" for a Sunnyvale day/month.
-const RAIN_JAR_MAX_IN = { day: 1, month: 6 };
+// as "nearly full" for a Sunnyvale day/month/season.
+const RAIN_JAR_MAX_IN = { day: 1, month: 6, season: 15 };
 
 // Gauge calibration: needle is vertical at "normal" relative pressure, 90deg
 // of rotation per 1.25 inHg, clamped to +/-150deg so it can't wrap around.
@@ -41,9 +42,14 @@ const els = {
     },
 };
 
+const HISTORY_REFRESH_INTERVAL_MS = 5 * 60_000;
+
 let useMetric = localStorage.getItem("units") === "metric";
 let latest = null;
 let readingAt = null;
+let history = null;
+let seasonRain = null;
+let monthRain = null;
 
 function fToC(f) {
     return (f - 32) * (5 / 9);
@@ -64,6 +70,12 @@ function mphToKmh(mph) {
 function round(value, places = 1) {
     const factor = 10 ** places;
     return Math.round(value * factor) / factor;
+}
+
+// Unlike round(), always pads to the given number of decimal places (e.g.
+// "5.0" not "5") so values don't visually jitter in width between renders.
+function formatFixed(value, places) {
+    return value.toFixed(places);
 }
 
 function clamp(value, min, max) {
@@ -124,12 +136,74 @@ function renderTemp(tempUnit) {
     const feelsLike = useMetric ? fToC(latest.feelsLike) : latest.feelsLike;
     const dewPoint = useMetric ? fToC(latest.dewPoint) : latest.dewPoint;
 
-    tile.querySelector(".temp-ring .num").textContent = round(temp);
+    tile.querySelector(".temp-ring .num").textContent = formatFixed(temp, 1);
     tile.querySelector(".temp-ring .unit").textContent = tempUnit;
     tile.querySelector(".temp-ring").style.setProperty("--temp-color", tempColor(latest.tempf));
     tile.querySelector(".humidity").textContent = `${round(latest.humidity, 0)}%`;
-    tile.querySelector(".dew-point").textContent = `${round(dewPoint)}${tempUnit}`;
-    tile.querySelector(".feels-like strong").textContent = `${round(feelsLike)}${tempUnit}`;
+    tile.querySelector(".dew-point").textContent = `${formatFixed(dewPoint, 1)}${tempUnit}`;
+    tile.querySelector(".feels-like strong").textContent = `${formatFixed(feelsLike, 1)}${tempUnit}`;
+
+    renderYesterdayDelta(tile, tempUnit);
+    renderTempRange(tile, tempUnit);
+}
+
+function renderYesterdayDelta(tile, tempUnit) {
+    const el = tile.querySelector(".yesterday-delta");
+    if (!history || typeof history.yesterdayTempF !== "number") {
+        el.textContent = "–";
+        return;
+    }
+
+    const diffF = latest.tempf - history.yesterdayTempF;
+    const diffRaw = useMetric ? diffF * (5 / 9) : diffF;
+    const diff = round(diffRaw);
+    const arrow = diff > 0 ? "↑" : diff < 0 ? "↓" : "→";
+    el.textContent = `${arrow} ${formatFixed(Math.abs(diff), 1)}${tempUnit}`;
+}
+
+function renderTempRange(tile, tempUnit) {
+    setRangeRow(tile, "today", history?.todayLow, history?.todayHigh, tempUnit);
+
+    // Only render the month row once the spreadsheet fetch has actually
+    // succeeded at least once — otherwise this would silently collapse to
+    // just today's (much narrower) range and look like a real month answer.
+    if (!monthRain) {
+        setRangeRow(tile, "month", null, null, tempUnit);
+        return;
+    }
+
+    // Month range = spreadsheet's high/low through yesterday, widened by
+    // today's own live high/low — same "spreadsheet through yesterday plus
+    // today live" split used for month rain, for the same reason (avoids a
+    // bad same-day spreadsheet row skewing the month). On the 1st of the
+    // month there's no "through yesterday" data yet, so this naturally
+    // collapses to just today's range, which is correct in that case.
+    let monthLow = monthRain.monthLowThroughYesterdayF;
+    let monthHigh = monthRain.monthHighThroughYesterdayF;
+    if (typeof history?.todayLow === "number") {
+        monthLow = typeof monthLow === "number" ? Math.min(monthLow, history.todayLow) : history.todayLow;
+    }
+    if (typeof history?.todayHigh === "number") {
+        monthHigh = typeof monthHigh === "number" ? Math.max(monthHigh, history.todayHigh) : history.todayHigh;
+    }
+    setRangeRow(tile, "month", monthLow, monthHigh, tempUnit);
+}
+
+function setRangeRow(tile, range, lowF, highF, tempUnit) {
+    const row = tile.querySelector(`.temp-range[data-range="${range}"]`);
+    const lowEl = row.querySelector(".range-low");
+    const highEl = row.querySelector(".range-high");
+
+    if (typeof lowF !== "number" || typeof highF !== "number") {
+        lowEl.textContent = "–";
+        highEl.textContent = "–";
+        return;
+    }
+
+    const low = useMetric ? fToC(lowF) : lowF;
+    const high = useMetric ? fToC(highF) : highF;
+    lowEl.textContent = `${formatFixed(low, 1)}${tempUnit}`;
+    highEl.textContent = `${formatFixed(high, 1)}${tempUnit}`;
 }
 
 function renderWind(speedUnit) {
@@ -156,14 +230,15 @@ function renderPressure(pressureUnit) {
         PRESSURE_MAX_ANGLE
     );
 
-    tile.querySelector(".pressure-value .num").textContent = round(pressure, useMetric ? 0 : 2);
+    const pressurePlaces = useMetric ? 0 : 2;
+    tile.querySelector(".pressure-value .num").textContent = formatFixed(pressure, pressurePlaces);
     tile.querySelector(".pressure-value .unit").textContent = pressureUnit;
     tile.querySelector(".needle").style.setProperty("--deg", `${angle}deg`);
 
     for (const label of tile.pressureTickLabels) {
         const valueInHg = pressureAngleToInHg(label.deg);
         const value = useMetric ? inHgToHpa(valueInHg) : valueInHg;
-        label.el.textContent = round(value, useMetric ? 0 : 1);
+        label.el.textContent = formatFixed(value, pressurePlaces);
     }
 }
 
@@ -172,7 +247,18 @@ function renderRain(rainUnit) {
     const jars = tile.querySelectorAll(".jar");
 
     setJar(jars[0], latest.dailyrainin, RAIN_JAR_MAX_IN.day, rainUnit);
-    setJar(jars[1], latest.monthlyrainin, RAIN_JAR_MAX_IN.month, rainUnit);
+
+    // Month total = spreadsheet sum through yesterday + today's live station
+    // reading, rather than trusting the station's own running monthly total,
+    // since the spreadsheet and station occasionally disagree after a
+    // station hiccup.
+    if (monthRain && typeof monthRain.monthToYesterdayIn === "number") {
+        setJar(jars[1], monthRain.monthToYesterdayIn + latest.dailyrainin, RAIN_JAR_MAX_IN.month, rainUnit);
+    }
+
+    if (seasonRain && typeof seasonRain.seasonRainIn === "number") {
+        setJar(jars[2], seasonRain.seasonRainIn, RAIN_JAR_MAX_IN.season, rainUnit);
+    }
 }
 
 function setJar(jarEl, amountIn, maxIn, rainUnit) {
@@ -180,7 +266,7 @@ function setJar(jarEl, amountIn, maxIn, rainUnit) {
     const fillPercent = clamp((amountIn / maxIn) * 100, 4, 100);
 
     jarEl.querySelector(".jar-fill").style.setProperty("--fill", `${fillPercent}%`);
-    jarEl.querySelector(".jar-value").textContent = `${round(amount, useMetric ? 1 : 2)} ${rainUnit}`;
+    jarEl.querySelector(".jar-value").textContent = `${formatFixed(amount, useMetric ? 1 : 2)} ${rainUnit}`;
 }
 
 function renderSolar() {
@@ -189,6 +275,10 @@ function renderSolar() {
 
     tile.querySelector(".sun-core").style.setProperty("--core-size", `${corePercent}%`);
     tile.querySelector(".solar-value .num").textContent = round(latest.solarradiation, 0);
+
+    const hoursEl = tile.querySelector(".sunshine-hours .num");
+    hoursEl.textContent =
+        history && typeof history.sunshineHours === "number" ? formatFixed(history.sunshineHours, 1) : "–";
 }
 
 function formatAgo(ms) {
@@ -228,6 +318,44 @@ async function fetchCurrent() {
         console.error(err);
         setStatus("Unable to load weather data right now.", "error");
     }
+}
+
+async function fetchHistory() {
+    try {
+        const res = await fetch("/api/history");
+        if (!res.ok) throw new Error(`Request failed: ${res.status}`);
+        history = await res.json();
+    } catch (err) {
+        console.error(err);
+        return;
+    }
+    if (latest) render();
+}
+
+async function fetchSeasonRain() {
+    try {
+        const res = await fetch("/api/season-rain");
+        if (!res.ok) throw new Error(`Request failed: ${res.status}`);
+        seasonRain = await res.json();
+    } catch (err) {
+        console.error(err);
+        setTimeout(fetchSeasonRain, SHEET_RAIN_RETRY_DELAY_MS);
+        return;
+    }
+    if (latest) render();
+}
+
+async function fetchMonthRain() {
+    try {
+        const res = await fetch("/api/month-rain");
+        if (!res.ok) throw new Error(`Request failed: ${res.status}`);
+        monthRain = await res.json();
+    } catch (err) {
+        console.error(err);
+        setTimeout(fetchMonthRain, SHEET_RAIN_RETRY_DELAY_MS);
+        return;
+    }
+    if (latest) render();
 }
 
 els.unitToggle.addEventListener("click", () => {
@@ -280,6 +408,14 @@ els.tiles.pressure.pressureTickLabels = addTickLabels(
     Object.fromEntries(PRESSURE_TICK_DEGS.map((deg) => [deg, ""]))
 );
 
+// Staggered so the two initial requests don't land in the same second and
+// trip Ambient Weather's per-second rate limit.
 fetchCurrent();
+setTimeout(fetchHistory, 1500);
+fetchSeasonRain();
+fetchMonthRain();
 setInterval(fetchCurrent, REFRESH_INTERVAL_MS);
+setInterval(fetchHistory, HISTORY_REFRESH_INTERVAL_MS);
+setInterval(fetchSeasonRain, SHEET_RAIN_REFRESH_INTERVAL_MS);
+setInterval(fetchMonthRain, SHEET_RAIN_REFRESH_INTERVAL_MS);
 setInterval(updateLastUpdatedLabel, 1000);

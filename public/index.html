@@ -14,7 +14,6 @@
         <header class="dashboard-header">
             <div class="heading">
                 <h1>Sunnyvale Weather</h1>
-                <p class="subtitle">Live conditions from the backyard station</p>
             </div>
             <div class="header-controls">
                 <button id="unit-toggle" class="pill-button" type="button" aria-label="Switch units">°F</button>
@@ -40,9 +39,27 @@
                             <dt>Dew Point</dt>
                             <dd class="dew-point">&ndash;</dd>
                         </div>
+                        <div class="meta-row">
+                            <dt>From yesterday</dt>
+                            <dd class="yesterday-delta">&ndash;</dd>
+                        </div>
                     </dl>
                 </div>
                 <p class="feels-like">Feels like <strong>&ndash;</strong></p>
+                <div class="temp-range" data-range="today">
+                    <span class="temp-range-label">Today</span>
+                    <div class="range-bar">
+                        <span class="range-value range-low">&ndash;</span>
+                        <span class="range-value range-high">&ndash;</span>
+                    </div>
+                </div>
+                <div class="temp-range" data-range="month">
+                    <span class="temp-range-label">Month</span>
+                    <div class="range-bar">
+                        <span class="range-value range-low">&ndash;</span>
+                        <span class="range-value range-high">&ndash;</span>
+                    </div>
+                </div>
             </article>
 
             <article class="card card-wind" data-tile="wind">
@@ -79,6 +96,13 @@
                         <p class="jar-value">&ndash;</p>
                         <p class="jar-label">Month</p>
                     </div>
+                    <div class="jar">
+                        <div class="jar-body">
+                            <div class="jar-fill"></div>
+                        </div>
+                        <p class="jar-value">&ndash;</p>
+                        <p class="jar-label">Season</p>
+                    </div>
                 </div>
             </article>
 
@@ -88,6 +112,7 @@
                     <div class="sun-core"></div>
                 </div>
                 <p class="solar-value"><span class="num">&ndash;</span> <span class="unit">W/m²</span></p>
+                <p class="sunshine-hours">Sunshine hours: <span class="num">&ndash;</span></p>
             </article>
         </section>
 

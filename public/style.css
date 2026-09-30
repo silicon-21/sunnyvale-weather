@@ -292,6 +292,71 @@ body {
     font-weight: 700;
 }
 
+.temp-range {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border-hairline);
+}
+
+.temp-range + .temp-range {
+    margin-top: 28px;
+    padding-top: 0;
+    border-top: none;
+}
+
+.temp-range-label {
+    width: 48px;
+    font-size: 14px;
+    color: var(--text-secondary);
+    flex-shrink: 0;
+}
+
+.range-bar {
+    position: relative;
+    flex: 1;
+    height: 1px;
+    background: var(--border-strong);
+    margin-top: 20px;
+}
+
+.range-bar::before,
+.range-bar::after {
+    content: "";
+    position: absolute;
+    top: -4px;
+    width: 1.5px;
+    height: 9px;
+    background: var(--border-strong);
+}
+
+.range-bar::before {
+    left: 0;
+}
+
+.range-bar::after {
+    right: 0;
+}
+
+.range-value {
+    position: absolute;
+    top: -22px;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-primary);
+    white-space: nowrap;
+}
+
+.range-low {
+    left: 0;
+}
+
+.range-high {
+    right: 0;
+}
+
 /* Wind */
 
 .wind-ring {
@@ -441,6 +506,18 @@ body {
 .solar-value .unit {
     font-weight: 400;
     color: var(--text-secondary);
+}
+
+.sunshine-hours {
+    text-align: center;
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-top: 4px;
+}
+
+.sunshine-hours .num {
+    font-weight: 700;
+    color: var(--text-primary);
 }
 
 .last-updated {
