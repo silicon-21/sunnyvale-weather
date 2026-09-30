@@ -9,6 +9,7 @@
 </head>
 
 <body>
+    <img class="banner" src="banner.jpg" alt="Fog over the hills above Sunnyvale" />
     <main class="dashboard">
         <header class="dashboard-header">
             <div class="heading">
@@ -24,40 +25,69 @@
         <p id="status-line" class="status-line" role="status">Loading current conditions&hellip;</p>
 
         <section class="grid" id="tile-grid" aria-live="polite">
-            <article class="card" data-tile="temp">
+            <article class="card card-temp" data-tile="temp">
                 <h2>Temperature</h2>
-                <p class="value"><span class="num">&ndash;</span><span class="unit">°F</span></p>
-                <p class="sub">Feels like <span class="feels-like">&ndash;</span></p>
+                <div class="temp-body">
+                    <div class="ring temp-ring">
+                        <span class="num">&ndash;</span><span class="unit">°F</span>
+                    </div>
+                    <dl class="temp-meta">
+                        <div class="meta-row">
+                            <dt>Humidity</dt>
+                            <dd class="humidity">&ndash;</dd>
+                        </div>
+                        <div class="meta-row">
+                            <dt>Dew Point</dt>
+                            <dd class="dew-point">&ndash;</dd>
+                        </div>
+                    </dl>
+                </div>
+                <p class="feels-like">Feels like <strong>&ndash;</strong></p>
             </article>
 
-            <article class="card" data-tile="humidity">
-                <h2>Humidity</h2>
-                <p class="value"><span class="num">&ndash;</span><span class="unit">%</span></p>
-                <p class="sub">Dew point <span class="dew-point">&ndash;</span></p>
-            </article>
-
-            <article class="card" data-tile="wind">
+            <article class="card card-wind" data-tile="wind">
                 <h2>Wind</h2>
-                <p class="value"><span class="num">&ndash;</span><span class="unit">mph</span></p>
-                <p class="sub">Gusting <span class="gust">&ndash;</span> &middot; <span class="dir">&ndash;</span></p>
+                <div class="ring wind-ring">
+                    <div class="compass"><span class="arrow-head"></span></div>
+                    <span class="num">&ndash;</span><span class="unit">mph</span>
+                    <span class="gust">G &ndash; mph</span>
+                </div>
             </article>
 
-            <article class="card" data-tile="pressure">
+            <article class="card card-pressure" data-tile="pressure">
                 <h2>Pressure</h2>
-                <p class="value"><span class="num">&ndash;</span><span class="unit">inHg</span></p>
-                <p class="sub trend">&ndash;</p>
+                <div class="ring pressure-ring">
+                    <span class="needle"></span>
+                </div>
+                <p class="pressure-value"><span class="num">&ndash;</span> <span class="unit">inHg</span></p>
             </article>
 
-            <article class="card" data-tile="rain">
-                <h2>Rainfall</h2>
-                <p class="value"><span class="num">&ndash;</span><span class="unit">in</span></p>
-                <p class="sub">Rate <span class="rain-rate">&ndash;</span></p>
+            <article class="card card-rain" data-tile="rain">
+                <h2>Rain</h2>
+                <div class="jars">
+                    <div class="jar">
+                        <div class="jar-body">
+                            <div class="jar-fill"></div>
+                        </div>
+                        <p class="jar-value">&ndash;</p>
+                        <p class="jar-label">Day</p>
+                    </div>
+                    <div class="jar">
+                        <div class="jar-body">
+                            <div class="jar-fill"></div>
+                        </div>
+                        <p class="jar-value">&ndash;</p>
+                        <p class="jar-label">Month</p>
+                    </div>
+                </div>
             </article>
 
-            <article class="card" data-tile="solar">
-                <h2>Solar Radiation</h2>
-                <p class="value"><span class="num">&ndash;</span><span class="unit">W/m²</span></p>
-                <p class="sub">UV index <span class="uv">&ndash;</span></p>
+            <article class="card card-solar" data-tile="solar">
+                <h2>Sunshine</h2>
+                <div class="sun-disc">
+                    <div class="sun-core"></div>
+                </div>
+                <p class="solar-value"><span class="num">&ndash;</span> <span class="unit">W/m²</span></p>
             </article>
         </section>
 

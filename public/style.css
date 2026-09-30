@@ -1,12 +1,16 @@
 :root {
     color-scheme: light;
-    --page-plane: #f9f9f7;
-    --surface-1: #fcfcfb;
+    --page-plane: #f3f2ef;
+    --surface-1: #ffffff;
     --text-primary: #0b0b0b;
     --text-secondary: #52514e;
     --text-muted: #898781;
+    --border-strong: #1a1a1a;
     --border-hairline: rgba(11, 11, 11, 0.10);
-    --accent: #2a78d6;
+    --accent-temp: #1baf7a;
+    --accent-rain: #2a78d6;
+    --accent-sun-core: #eda100;
+    --accent-sun-halo: #e7e6e1;
     --status-warning: #fab219;
     --status-critical: #d03b3b;
 }
@@ -14,13 +18,17 @@
 @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
         color-scheme: dark;
-        --page-plane: #0d0d0d;
-        --surface-1: #1a1a19;
+        --page-plane: #141414;
+        --surface-1: #2b2b2a;
         --text-primary: #ffffff;
         --text-secondary: #c3c2b7;
-        --text-muted: #898781;
-        --border-hairline: rgba(255, 255, 255, 0.10);
-        --accent: #3987e5;
+        --text-muted: #9b9a92;
+        --border-strong: #e6e6e1;
+        --border-hairline: rgba(255, 255, 255, 0.12);
+        --accent-temp: #199e70;
+        --accent-rain: #3987e5;
+        --accent-sun-core: #c98500;
+        --accent-sun-halo: #3a3a38;
         --status-warning: #fab219;
         --status-critical: #e66767;
     }
@@ -28,13 +36,17 @@
 
 :root[data-theme="dark"] {
     color-scheme: dark;
-    --page-plane: #0d0d0d;
-    --surface-1: #1a1a19;
+    --page-plane: #141414;
+    --surface-1: #2b2b2a;
     --text-primary: #ffffff;
     --text-secondary: #c3c2b7;
-    --text-muted: #898781;
-    --border-hairline: rgba(255, 255, 255, 0.10);
-    --accent: #3987e5;
+    --text-muted: #9b9a92;
+    --border-strong: #e6e6e1;
+    --border-hairline: rgba(255, 255, 255, 0.12);
+    --accent-temp: #199e70;
+    --accent-rain: #3987e5;
+    --accent-sun-core: #c98500;
+    --accent-sun-halo: #3a3a38;
     --status-warning: #fab219;
     --status-critical: #e66767;
 }
@@ -50,12 +62,19 @@ body {
     background: var(--page-plane);
     color: var(--text-primary);
     min-height: 100vh;
-    padding: clamp(16px, 4vw, 40px);
 }
 
 .dashboard {
-    max-width: 1000px;
+    max-width: 900px;
     margin: 0 auto;
+    padding: clamp(16px, 4vw, 40px);
+}
+
+.banner {
+    width: 100%;
+    height: clamp(160px, 28vw, 320px);
+    object-fit: cover;
+    display: block;
 }
 
 .dashboard-header {
@@ -85,17 +104,13 @@ body {
 .pill-button {
     background: var(--surface-1);
     color: var(--text-primary);
-    border: 1px solid var(--border-hairline);
+    border: 1.5px solid var(--border-strong);
     border-radius: 999px;
     padding: 8px 16px;
     font-size: 14px;
     font-weight: 600;
     cursor: pointer;
-    transition: transform 0.15s, border-color 0.15s;
-}
-
-.pill-button:hover {
-    border-color: var(--accent);
+    transition: transform 0.15s;
 }
 
 .pill-button:active {
@@ -116,54 +131,315 @@ body {
     color: var(--status-warning);
 }
 
+/* Temperature (tall, left column) / Wind / Pressure (right column, stacked) /
+   Rain / Sunshine (bottom row) — relies on grid auto-placement filling
+   left-to-right, top-to-bottom around the temperature card's row span. */
 .grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    grid-template-columns: 3fr 2fr;
     gap: 16px;
 }
 
 .card {
     background: var(--surface-1);
     border: 1px solid var(--border-hairline);
-    border-radius: 12px;
+    border-radius: 18px;
     padding: 20px;
-    transition: transform 0.15s;
-}
-
-.card:hover {
-    transform: translateY(-3px);
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.16);
 }
 
 .card h2 {
-    font-size: 15px;
-    font-weight: 600;
-    color: var(--text-secondary);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    margin-bottom: 8px;
+    font-size: 17px;
+    font-weight: 500;
+    color: var(--text-primary);
 }
 
-.card .value {
+.card-temp {
+    grid-row: span 2;
+}
+
+.card-wind .ring,
+.card-pressure .ring,
+.card-solar .sun-disc {
+    margin-top: auto;
+    margin-bottom: auto;
+}
+
+.ring {
+    position: relative;
+    width: min(180px, 45%);
+    aspect-ratio: 1 / 1;
+    border-radius: 50%;
+    border: 2px solid var(--border-strong);
     display: flex;
-    align-items: baseline;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    margin: 16px auto;
+}
+
+/* Wind tick marks: full circle (any direction is valid), just inside the
+   ring border — minor every 10deg, bolder major every 90deg. */
+.wind-ring::before {
+    content: "";
+    position: absolute;
+    inset: 4px;
+    border-radius: 50%;
+    background: repeating-conic-gradient(var(--text-muted) 0deg 1deg, transparent 1deg 10deg);
+    -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 9px), #000 calc(100% - 9px) calc(100% - 5px), transparent calc(100% - 5px));
+    mask: radial-gradient(farthest-side, transparent calc(100% - 9px), #000 calc(100% - 9px) calc(100% - 5px), transparent calc(100% - 5px));
+    pointer-events: none;
+}
+
+.wind-ring::after {
+    content: "";
+    position: absolute;
+    inset: 4px;
+    border-radius: 50%;
+    background: repeating-conic-gradient(var(--text-primary) 0deg 2deg, transparent 2deg 90deg);
+    -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 16px), #000 calc(100% - 16px) calc(100% - 5px), transparent calc(100% - 5px));
+    mask: radial-gradient(farthest-side, transparent calc(100% - 16px), #000 calc(100% - 16px) calc(100% - 5px), transparent calc(100% - 5px));
+    pointer-events: none;
+}
+
+/* Pressure tick marks: the gauge only swings +/-150deg, so ticks are drawn
+   as individual elements (not a repeating-conic-gradient, which always
+   wraps the full circle) so the unused bottom arc can stay bare. */
+.pressure-ring .tick-mark {
+    position: absolute;
+    bottom: 50%;
+    left: 50%;
+    width: 1.5px;
+    height: 44%;
+    background: linear-gradient(to top, transparent 0%, transparent 82%, var(--text-muted) 82%, var(--text-muted) 100%);
+    transform-origin: bottom center;
+    transform: translateX(-50%) rotate(var(--tick-deg));
+    pointer-events: none;
+}
+
+.pressure-ring .tick-mark.tick-major {
+    width: 2px;
+    background: linear-gradient(to top, transparent 0%, transparent 68%, var(--text-primary) 68%, var(--text-primary) 100%);
+}
+
+.tick-label {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform-origin: 0 0;
+    transform: rotate(var(--tick-deg)) translateY(-40px) rotate(calc(-1 * var(--tick-deg)));
+}
+
+.tick-label span {
+    position: absolute;
+    top: 0;
+    left: 0;
+    transform: translate(-50%, -50%);
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
+/* Temperature */
+
+.temp-body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.temp-ring .num,
+.temp-ring .unit {
+    font-size: clamp(32px, 7vw, 48px);
+    font-weight: 600;
+    color: var(--temp-color, var(--accent-temp));
+}
+
+.temp-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.meta-row dt {
+    font-size: 14px;
+    color: var(--text-secondary);
+    font-weight: 400;
+}
+
+.meta-row dd {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.feels-like {
+    text-align: center;
+    font-size: 15px;
+    color: var(--text-secondary);
+    margin-top: auto;
+    padding-top: 12px;
+}
+
+.feels-like strong {
+    color: var(--text-primary);
+    font-weight: 700;
+}
+
+/* Wind */
+
+.wind-ring {
+    width: min(140px, 60%);
+}
+
+.wind-ring .num {
+    font-size: 26px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.wind-ring .unit {
+    font-size: 14px;
+    color: var(--text-primary);
+    margin-left: 2px;
+}
+
+.wind-ring .gust {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-top: 4px;
+}
+
+.compass {
+    position: absolute;
+    inset: 0;
+    transform: rotate(var(--deg, 0deg));
+    transition: transform 0.4s;
+}
+
+.arrow-head {
+    position: absolute;
+    top: -9px;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-left: 8px solid transparent;
+    border-right: 8px solid transparent;
+    border-bottom: 16px solid var(--text-primary);
+    transform: translate(-50%, 0);
+}
+
+/* Pressure */
+
+.pressure-ring {
+    width: min(140px, 60%);
+}
+
+.pressure-ring .needle {
+    position: absolute;
+    bottom: 50%;
+    left: 50%;
+    width: 2px;
+    height: 26%;
+    background: var(--text-primary);
+    transform-origin: bottom center;
+    transform: translateX(-50%) rotate(var(--deg, 0deg));
+    transition: transform 0.4s;
+}
+
+.pressure-value {
+    text-align: center;
+    font-weight: 700;
+    font-size: 16px;
+    margin-top: 8px;
+}
+
+.pressure-value .unit {
+    font-weight: 400;
+    color: var(--text-secondary);
+}
+
+/* Rain */
+
+.jars {
+    display: flex;
+    justify-content: space-around;
+    align-items: flex-end;
+    gap: 16px;
+    margin: 16px 0;
+    flex: 1;
+}
+
+.jar {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
     gap: 6px;
 }
 
-.card .value .num {
-    font-size: 40px;
-    font-weight: 600;
-    color: var(--text-primary);
-    font-variant-numeric: proportional-nums;
+.jar-body {
+    width: 44px;
+    height: 110px;
+    border: 1.5px solid var(--border-strong);
+    border-radius: 8px 8px 4px 4px;
+    overflow: hidden;
+    display: flex;
+    align-items: flex-end;
 }
 
-.card .value .unit {
+.jar-fill {
+    width: 100%;
+    height: var(--fill, 4%);
+    min-height: 4%;
+    background: var(--accent-rain);
+    transition: height 0.4s;
+}
+
+.jar-value {
+    font-weight: 700;
+    font-size: 15px;
+}
+
+.jar-label {
+    color: var(--text-secondary);
+    font-size: 13px;
+}
+
+/* Sunshine */
+
+.sun-disc {
+    width: min(140px, 55%);
+    aspect-ratio: 1 / 1;
+    border-radius: 50%;
+    background: var(--accent-sun-halo);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 16px auto;
+}
+
+.sun-core {
+    width: var(--core-size, 30%);
+    height: var(--core-size, 30%);
+    border-radius: 50%;
+    background: var(--accent-sun-core);
+    transition: width 0.4s, height 0.4s;
+}
+
+.solar-value {
+    text-align: center;
+    font-weight: 700;
     font-size: 16px;
-    color: var(--text-muted);
 }
 
-.card .sub {
-    margin-top: 8px;
-    font-size: 14px;
+.solar-value .unit {
+    font-weight: 400;
     color: var(--text-secondary);
 }
 
@@ -174,8 +450,16 @@ body {
     color: var(--text-muted);
 }
 
-@media (max-width: 500px) {
+@media (max-width: 640px) {
     .dashboard-header {
         flex-direction: column;
+    }
+
+    .grid {
+        grid-template-columns: 1fr;
+    }
+
+    .card-temp {
+        grid-row: auto;
     }
 }

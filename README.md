@@ -1,4 +1,4 @@
-# Sunnyvale Weather
+**This is just the README. The actual site can be found at https://sunnyvale-weather.shishir-iyer62.workers.dev/**
 
 Update (09-27-2026): Didn't think I'd ever return to this repo. Currently vibe-rewriting everything to eventually use data from my weather spreadsheet, but for now we just have the dashboard for current conditions.
 
