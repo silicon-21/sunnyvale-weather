@@ -20,12 +20,13 @@ const SOLAR_MAX_WM2 = 1000;
 // Temperature ring color, interpolated between stops (always keyed on raw °F
 // so it doesn't shift when the unit toggle flips to Celsius).
 const TEMP_COLOR_STOPS = [
-    [20, [28, 92, 171]], // deep blue
-    [45, [57, 135, 229]], // blue
-    [60, [27, 175, 122]], // teal green
+    [15, [28, 92, 171]], // deep blue
+    [30, [57, 135, 229]], // blue
+    [45, [27, 175, 122]], // teal green
+    [60, [252, 236, 3]], // yellow
     [75, [237, 161, 0]], // amber
-    [90, [235, 104, 52]], // orange
-    [105, [208, 59, 59]], // red
+    [90, [208, 59, 59]], // red
+    [105, [181, 0, 131]], // magenta
 ];
 
 const els = {
@@ -157,8 +158,8 @@ function renderYesterdayDelta(tile, tempUnit) {
     const diffF = latest.tempf - history.yesterdayTempF;
     const diffRaw = useMetric ? diffF * (5 / 9) : diffF;
     const diff = round(diffRaw);
-    const arrow = diff > 0 ? "↑" : diff < 0 ? "↓" : "→";
-    el.textContent = `${arrow} ${formatFixed(Math.abs(diff), 1)}${tempUnit}`;
+    const arrow = diff > 0 ? "↑" : diff < 0 ? "↓" : "";
+    el.textContent = `${arrow} ${formatFixed(Math.abs(diff), 1)}${tempUnit}`.trim();
 }
 
 function renderTempRange(tile, tempUnit) {
