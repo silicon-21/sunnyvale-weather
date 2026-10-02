@@ -129,6 +129,7 @@ async function handleHistory(env) {
     let todayHigh = null;
     let todayLow = null;
     let sunshinePoints = 0;
+    const points = [];
     for (const r of readings) {
         if (dayFmt.format(new Date(r.dateutc)) !== today) continue;
         if (typeof r.tempf === "number") {
@@ -138,13 +139,34 @@ async function handleHistory(env) {
         if (typeof r.solarradiation === "number" && r.solarradiation > SUNSHINE_THRESHOLD_WM2) {
             sunshinePoints++;
         }
+        points.push({
+            t: r.dateutc,
+            tempf: r.tempf,
+            feelsLike: r.feelsLike,
+            dewPoint: r.dewPoint,
+            windspeedmph: r.windspeedmph,
+            windgustmph: r.windgustmph,
+            winddir: r.winddir,
+            dailyrainin: r.dailyrainin,
+            hourlyrainin: r.hourlyrainin,
+            baromrelin: r.baromrelin,
+            solarradiation: r.solarradiation,
+        });
     }
+    points.sort((a, b) => a.t - b.t);
     const sunshineHours = sunshinePoints / SUNSHINE_POINTS_PER_HOUR;
 
     const dayAgoMs = Date.now() - 24 * 60 * 60 * 1000;
     const yesterday = readings.reduce((closest, r) =>
         Math.abs(r.dateutc - dayAgoMs) < Math.abs(closest.dateutc - dayAgoMs) ? r : closest
     );
+
+    // Today's Pacific-local day bounds (for the graphs' x-axis), derived from
+    // the timezone's current UTC offset rather than hardcoding PST/PDT.
+    const offsetMinutes = pacificUtcOffsetMinutes(new Date());
+    const { year, month, day } = pacificDateParts(new Date());
+    const dayStartMs = Date.UTC(year, month - 1, day, 0, 0, 0) - offsetMinutes * 60_000;
+    const dayEndMs = dayStartMs + 24 * 60 * 60 * 1000;
 
     return jsonResponse(
         {
@@ -153,10 +175,23 @@ async function handleHistory(env) {
             yesterdayTempF: typeof yesterday?.tempf === "number" ? yesterday.tempf : null,
             yesterdayAt: yesterday?.dateutc ?? null,
             sunshineHours,
+            dayStartMs,
+            dayEndMs,
+            points,
         },
         200,
         { "cache-control": "public, max-age=120" }
     );
+}
+
+function pacificUtcOffsetMinutes(date) {
+    const parts = new Intl.DateTimeFormat("en-US", {
+        timeZone: "America/Los_Angeles",
+        timeZoneName: "shortOffset",
+    }).formatToParts(date);
+    const offset = parts.find((p) => p.type === "timeZoneName")?.value ?? "GMT-8";
+    const match = offset.match(/GMT([+-]\d+)/);
+    return match ? Number(match[1]) * 60 : -480;
 }
 
 function pacificDateParts(date) {

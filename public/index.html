@@ -117,6 +117,75 @@
         </section>
 
         <p class="last-updated" id="last-updated"></p>
+
+        <section class="history" id="history-section" aria-live="polite">
+            <article class="chart-card" data-chart="temp">
+                <h2>Temperature</h2>
+                <div class="chart-legend">
+                    <span class="legend-item"><span class="legend-swatch" style="--swatch: var(--chart-red)"></span>Temp</span>
+                    <span class="legend-item"><span class="legend-swatch" style="--swatch: var(--chart-tertiary)"></span>Feels like</span>
+                    <span class="legend-item"><span class="legend-swatch" style="--swatch: var(--chart-green)"></span>Dew point</span>
+                </div>
+                <div class="chart-wrap">
+                    <svg class="chart-svg" preserveAspectRatio="none"></svg>
+                    <div class="chart-tooltip" hidden></div>
+                </div>
+                <div class="chart-xaxis"></div>
+            </article>
+
+            <article class="chart-card" data-chart="wind-speed">
+                <h2>Wind</h2>
+                <div class="chart-legend">
+                    <span class="legend-item"><span class="legend-swatch" style="--swatch: var(--accent-rain)"></span>Speed</span>
+                    <span class="legend-item"><span class="legend-swatch" style="--swatch: var(--chart-secondary)"></span>Gust</span>
+                </div>
+                <div class="chart-wrap">
+                    <svg class="chart-svg" preserveAspectRatio="none"></svg>
+                    <div class="chart-tooltip" hidden></div>
+                </div>
+                <div class="chart-xaxis"></div>
+            </article>
+
+            <article class="chart-card" data-chart="wind-dir">
+                <h2>Wind Direction</h2>
+                <div class="chart-wrap">
+                    <svg class="chart-svg" preserveAspectRatio="none"></svg>
+                    <div class="chart-tooltip" hidden></div>
+                </div>
+                <div class="chart-xaxis"></div>
+            </article>
+
+            <article class="chart-card" data-chart="rain">
+                <h2>Rain</h2>
+                <div class="chart-legend">
+                    <span class="legend-item"><span class="legend-swatch" style="--swatch: var(--accent-rain)"></span>Total</span>
+                    <span class="legend-item"><span class="legend-swatch" style="--swatch: var(--chart-green-light)"></span>Rate</span>
+                </div>
+                <div class="chart-wrap">
+                    <svg class="chart-svg" preserveAspectRatio="none"></svg>
+                    <div class="chart-tooltip" hidden></div>
+                </div>
+                <div class="chart-xaxis"></div>
+            </article>
+
+            <article class="chart-card" data-chart="pressure">
+                <h2>Pressure</h2>
+                <div class="chart-wrap">
+                    <svg class="chart-svg" preserveAspectRatio="none"></svg>
+                    <div class="chart-tooltip" hidden></div>
+                </div>
+                <div class="chart-xaxis"></div>
+            </article>
+
+            <article class="chart-card" data-chart="solar">
+                <h2>Solar Radiation</h2>
+                <div class="chart-wrap">
+                    <svg class="chart-svg" preserveAspectRatio="none"></svg>
+                    <div class="chart-tooltip" hidden></div>
+                </div>
+                <div class="chart-xaxis"></div>
+            </article>
+        </section>
     </main>
 
     <script src="script.js"></script>
