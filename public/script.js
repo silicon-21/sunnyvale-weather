@@ -17,6 +17,10 @@ const PRESSURE_TICK_DEGS = [-150, -75, 0, 75, 150];
 // scaled against a typical clear-sky peak.
 const SOLAR_MAX_WM2 = 1000;
 
+const BANNER_NORMAL_SRC = "banner.jpg";
+const BANNER_HEAT_SRC = "heatabnormal.png";
+const HEAT_BANNER_THRESHOLD_F = 90;
+
 // Temperature ring color, interpolated between stops (always keyed on raw °F
 // so it doesn't shift when the unit toggle flips to Celsius).
 const TEMP_COLOR_STOPS = [
@@ -34,6 +38,7 @@ const els = {
     lastUpdated: document.getElementById("last-updated"),
     unitToggle: document.getElementById("unit-toggle"),
     refreshButton: document.getElementById("refresh-button"),
+    banner: document.getElementById("banner"),
     dateStatus: document.getElementById("date-status"),
     datePrev: document.getElementById("date-prev"),
     dateNext: document.getElementById("date-next"),
@@ -133,6 +138,7 @@ function render() {
 
     els.unitToggle.textContent = tempUnit;
 
+    renderBanner();
     renderTemp(tempUnit);
     renderWind(speedUnit);
     renderPressure(pressureUnit);
@@ -141,6 +147,17 @@ function render() {
     renderCharts();
 
     updateLastUpdatedLabel();
+}
+
+// Always keyed on raw °F (like tempColor()) so it doesn't flip based on the
+// display unit.
+function renderBanner() {
+    const isHeat = latest.tempf >= HEAT_BANNER_THRESHOLD_F;
+    const targetSrc = isHeat ? BANNER_HEAT_SRC : BANNER_NORMAL_SRC;
+    if (!els.banner.getAttribute("src").endsWith(targetSrc)) {
+        els.banner.src = targetSrc;
+        els.banner.alt = isHeat ? "Heat abnormal" : "Fog over the hills above Sunnyvale";
+    }
 }
 
 function renderTemp(tempUnit) {
