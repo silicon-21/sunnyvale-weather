@@ -19,7 +19,7 @@ export default {
         }
 
         if (url.pathname === "/api/history") {
-            return handleHistory(env);
+            return handleHistory(env, url.searchParams.get("date"));
         }
 
         if (url.pathname === "/api/season-rain") {
@@ -77,19 +77,42 @@ async function handleCurrent(env) {
 }
 
 // Today's high/low and the "from yesterday" comparison, both derived from a
-// single 24-hour history pull. The station reports every 5 minutes, so the
-// API's max limit (288) lines up exactly with a 24-hour window, newest first.
-async function handleHistory(env) {
+// single 24-hour history pull, plus the day's raw points for the graphs. The
+// station reports every 5 minutes, so the API's max limit (288) lines up
+// exactly with a 24-hour window, newest first.
+//
+// `requestedDate` (a "YYYY-MM-DD" Pacific date string, from the graphs' date
+// picker) switches this to a specific past day instead of today: the
+// upstream request is bounded with `endDate` at that day's Pacific midnight,
+// and the today-only stats (todayHigh/sunshineHours/yesterday delta) are
+// skipped, since those are the main dashboard's and always mean *today*
+// regardless of what the graphs are showing.
+async function handleHistory(env, requestedDate) {
     const { AMBIENT_API_KEY, AMBIENT_APPLICATION_KEY, AMBIENT_MAC_ADDRESS } = env;
 
     if (!AMBIENT_API_KEY || !AMBIENT_APPLICATION_KEY || !AMBIENT_MAC_ADDRESS) {
         return jsonResponse({ error: "Server is missing Ambient Weather credentials." }, 500);
     }
 
+    const now = new Date();
+    const isValidDateString = typeof requestedDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(requestedDate);
+    const isToday = !isValidDateString || requestedDate === pacificDateString(now);
+    const { dayStartMs, dayEndMs } = isToday ? pacificDayBoundsMs(now) : pacificDayBoundsMs(parsePacificDateString(requestedDate));
+
     const upstreamUrl = new URL(`https://api.ambientweather.net/v1/devices/${AMBIENT_MAC_ADDRESS}`);
     upstreamUrl.searchParams.set("apiKey", AMBIENT_API_KEY);
     upstreamUrl.searchParams.set("applicationKey", AMBIENT_APPLICATION_KEY);
-    upstreamUrl.searchParams.set("limit", "288");
+    if (isToday) {
+        upstreamUrl.searchParams.set("limit", "288");
+    } else {
+        // A few extra past a full day's 288 readings, so that if Ambient's
+        // `endDate` bound turns out to be inclusive of the next day's first
+        // reading, that doesn't crowd the target day's own first reading out
+        // of the limit — the explicit dayStartMs/dayEndMs filter below trims
+        // back to exactly the requested day either way.
+        upstreamUrl.searchParams.set("limit", "300");
+        upstreamUrl.searchParams.set("endDate", String(dayEndMs));
+    }
 
     let upstream;
     try {
@@ -110,31 +133,21 @@ async function handleHistory(env) {
         return jsonResponse({ error: "No history returned for this station." }, 502);
     }
 
-    // Bucket by Pacific calendar day so "today" means the station's local day,
-    // not a rolling 24 hours.
-    const dayFmt = new Intl.DateTimeFormat("en-CA", {
-        timeZone: "America/Los_Angeles",
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-    });
-    const today = dayFmt.format(new Date());
-
     // A "sunshine hour" is an hour where solar radiation clears 120 W/m^2. At a
     // 5-minute reporting interval that's 12 datapoints per hour, so counting
-    // today's datapoints above the threshold and dividing by 12 gives hours.
+    // the day's datapoints above the threshold and dividing by 12 gives hours.
     const SUNSHINE_THRESHOLD_WM2 = 120;
     const SUNSHINE_POINTS_PER_HOUR = 12;
 
-    let todayHigh = null;
-    let todayLow = null;
+    let dayHigh = null;
+    let dayLow = null;
     let sunshinePoints = 0;
     const points = [];
     for (const r of readings) {
-        if (dayFmt.format(new Date(r.dateutc)) !== today) continue;
+        if (r.dateutc < dayStartMs || r.dateutc >= dayEndMs) continue;
         if (typeof r.tempf === "number") {
-            if (todayHigh === null || r.tempf > todayHigh) todayHigh = r.tempf;
-            if (todayLow === null || r.tempf < todayLow) todayLow = r.tempf;
+            if (dayHigh === null || r.tempf > dayHigh) dayHigh = r.tempf;
+            if (dayLow === null || r.tempf < dayLow) dayLow = r.tempf;
         }
         if (typeof r.solarradiation === "number" && r.solarradiation > SUNSHINE_THRESHOLD_WM2) {
             sunshinePoints++;
@@ -154,24 +167,23 @@ async function handleHistory(env) {
         });
     }
     points.sort((a, b) => a.t - b.t);
-    const sunshineHours = sunshinePoints / SUNSHINE_POINTS_PER_HOUR;
 
+    if (!isToday) {
+        // A past day is immutable once it's over, so this can cache much
+        // longer than "today," which is still filling in.
+        return jsonResponse({ dayStartMs, dayEndMs, points }, 200, { "cache-control": "public, max-age=86400" });
+    }
+
+    const sunshineHours = sunshinePoints / SUNSHINE_POINTS_PER_HOUR;
     const dayAgoMs = Date.now() - 24 * 60 * 60 * 1000;
     const yesterday = readings.reduce((closest, r) =>
         Math.abs(r.dateutc - dayAgoMs) < Math.abs(closest.dateutc - dayAgoMs) ? r : closest
     );
 
-    // Today's Pacific-local day bounds (for the graphs' x-axis), derived from
-    // the timezone's current UTC offset rather than hardcoding PST/PDT.
-    const offsetMinutes = pacificUtcOffsetMinutes(new Date());
-    const { year, month, day } = pacificDateParts(new Date());
-    const dayStartMs = Date.UTC(year, month - 1, day, 0, 0, 0) - offsetMinutes * 60_000;
-    const dayEndMs = dayStartMs + 24 * 60 * 60 * 1000;
-
     return jsonResponse(
         {
-            todayHigh,
-            todayLow,
+            todayHigh: dayHigh,
+            todayLow: dayLow,
             yesterdayTempF: typeof yesterday?.tempf === "number" ? yesterday.tempf : null,
             yesterdayAt: yesterday?.dateutc ?? null,
             sunshineHours,
@@ -192,6 +204,24 @@ function pacificUtcOffsetMinutes(date) {
     const offset = parts.find((p) => p.type === "timeZoneName")?.value ?? "GMT-8";
     const match = offset.match(/GMT([+-]\d+)/);
     return match ? Number(match[1]) * 60 : -480;
+}
+
+// A Pacific calendar day's [start, end) bounds, in UTC ms, derived from that
+// instant's current UTC offset rather than hardcoding PST/PDT.
+function pacificDayBoundsMs(date) {
+    const offsetMinutes = pacificUtcOffsetMinutes(date);
+    const { year, month, day } = pacificDateParts(date);
+    const dayStartMs = Date.UTC(year, month - 1, day, 0, 0, 0) - offsetMinutes * 60_000;
+    return { dayStartMs, dayEndMs: dayStartMs + 24 * 60 * 60 * 1000 };
+}
+
+// A "YYYY-MM-DD" date string has no instant of its own — this just needs
+// *some* instant on that calendar date to resolve PST vs. PDT for it, so
+// noon UTC (safely clear of the date's actual midnight boundaries in either
+// direction) stands in.
+function parsePacificDateString(dateString) {
+    const [year, month, day] = dateString.split("-").map(Number);
+    return new Date(Date.UTC(year, month - 1, day, 12));
 }
 
 function pacificDateParts(date) {

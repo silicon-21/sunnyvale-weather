@@ -543,6 +543,51 @@ body {
     color: var(--text-muted);
 }
 
+.date-nav {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin-top: 20px;
+}
+
+.date-nav-arrow {
+    padding: 8px 14px;
+}
+
+.date-nav-arrow:disabled {
+    opacity: 0.35;
+    cursor: default;
+}
+
+.date-select {
+    display: flex;
+    gap: 8px;
+}
+
+.date-select select {
+    background: var(--surface-1);
+    color: var(--text-primary);
+    border: 1.5px solid var(--border-strong);
+    border-radius: 10px;
+    padding: 8px 10px;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.date-status {
+    margin-top: 6px;
+    min-height: 18px;
+    text-align: center;
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.date-status[data-state="error"] {
+    color: var(--status-critical);
+}
+
 /* History charts */
 
 .history {

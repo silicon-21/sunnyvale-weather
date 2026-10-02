@@ -118,6 +118,17 @@
 
         <p class="last-updated" id="last-updated"></p>
 
+        <div class="date-nav">
+            <button id="date-prev" class="pill-button date-nav-arrow" type="button" aria-label="Previous day">&larr;</button>
+            <div class="date-select" role="group" aria-label="Graph date">
+                <select id="date-month" aria-label="Month"></select>
+                <select id="date-day" aria-label="Day"></select>
+                <select id="date-year" aria-label="Year"></select>
+            </div>
+            <button id="date-next" class="pill-button date-nav-arrow" type="button" aria-label="Next day">&rarr;</button>
+        </div>
+        <p id="date-status" class="date-status" role="status"></p>
+
         <section class="history" id="history-section" aria-live="polite">
             <article class="chart-card" data-chart="temp">
                 <h2>Temperature</h2>

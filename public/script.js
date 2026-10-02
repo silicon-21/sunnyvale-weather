@@ -34,6 +34,12 @@ const els = {
     lastUpdated: document.getElementById("last-updated"),
     unitToggle: document.getElementById("unit-toggle"),
     refreshButton: document.getElementById("refresh-button"),
+    dateStatus: document.getElementById("date-status"),
+    datePrev: document.getElementById("date-prev"),
+    dateNext: document.getElementById("date-next"),
+    dateMonth: document.getElementById("date-month"),
+    dateDay: document.getElementById("date-day"),
+    dateYear: document.getElementById("date-year"),
     tiles: {
         temp: document.querySelector('[data-tile="temp"]'),
         wind: document.querySelector('[data-tile="wind"]'),
@@ -51,6 +57,11 @@ let readingAt = null;
 let history = null;
 let seasonRain = null;
 let monthRain = null;
+
+// The graphs' selected date — null means "today" (live, via `history`);
+// otherwise a "YYYY-MM-DD" Pacific date string, backed by `dayHistory`.
+let chartDate = null;
+let dayHistory = null;
 
 function fToC(f) {
     return (f - 32) * (5 / 9);
@@ -525,12 +536,25 @@ function chartCard(name) {
     return document.querySelector(`.chart-card[data-chart="${name}"]`);
 }
 
+function clearAllCharts() {
+    for (const svg of document.querySelectorAll(".chart-svg")) {
+        while (svg.firstChild) svg.removeChild(svg.firstChild);
+    }
+}
+
+// The graphs show either the live "today" data (chartDate === null, sourced
+// from `history`, which keeps refreshing) or a specific past day picked via
+// the date nav (sourced from the separately-fetched `dayHistory`).
 function renderCharts() {
-    if (!history || !Array.isArray(history.points) || history.points.length === 0) return;
-    const points = history.points;
+    const source = chartDate ? dayHistory : history;
+    const points = source && Array.isArray(source.points) ? source.points : [];
+    if (points.length === 0) {
+        clearAllCharts();
+        return;
+    }
     const xDomain = [
-        typeof history.dayStartMs === "number" ? history.dayStartMs : points[0].t,
-        typeof history.dayEndMs === "number" ? history.dayEndMs : Date.now(),
+        typeof source.dayStartMs === "number" ? source.dayStartMs : points[0].t,
+        typeof source.dayEndMs === "number" ? source.dayEndMs : Date.now(),
     ];
 
     renderTempChart(points, xDomain);
@@ -802,6 +826,183 @@ async function fetchMonthRain() {
     if (latest) render();
 }
 
+// ---- Graph date navigation ----
+// The main dashboard tiles always mean "today" — only the graphs below are
+// date-navigable. Picking a non-today date fetches that day's points into
+// `dayHistory`, independent of the live `history` object `fetchHistory()`
+// keeps refreshing; `renderCharts()` picks between them off `chartDate`.
+
+function pacificDateParts(date) {
+    const parts = new Intl.DateTimeFormat("en-US", {
+        timeZone: "America/Los_Angeles",
+        year: "numeric",
+        month: "numeric",
+        day: "numeric",
+    }).formatToParts(date);
+    const get = (type) => Number(parts.find((p) => p.type === type).value);
+    return { year: get("year"), month: get("month"), day: get("day") };
+}
+
+function daysInMonth(year, month) {
+    // Date's month argument is 0-indexed, so passing the 1-indexed `month`
+    // straight through points at the *next* month — day 0 of that rolls
+    // back to the last day of the month actually being asked about.
+    return new Date(Date.UTC(year, month, 0)).getUTCDate();
+}
+
+// Normalizes via a Date object (so an out-of-range day/month, like day 0 or
+// day 35, rolls over to the calendar date it actually means) before clamping
+// to today — the day <select>'s own options are always valid, but this
+// keeps the function correct for any input, not just ones the UI happens to
+// produce.
+function clampToToday(year, month, day) {
+    const normalized = new Date(Date.UTC(year, month - 1, day, 12));
+    const n = { year: normalized.getUTCFullYear(), month: normalized.getUTCMonth() + 1, day: normalized.getUTCDate() };
+
+    const today = pacificDateParts(new Date());
+    const pastToday =
+        n.year > today.year ||
+        (n.year === today.year && n.month > today.month) ||
+        (n.year === today.year && n.month === today.month && n.day > today.day);
+    return pastToday ? today : n;
+}
+
+const DATE_MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+// The year <select> only has a fixed lookback window built in; this expands
+// it on the fly if navigation (prev-day arrow) ever walks past it, rather
+// than silently failing to select an out-of-range year.
+function ensureYearOption(year) {
+    if ([...els.dateYear.options].some((o) => Number(o.value) === year)) return;
+    const today = pacificDateParts(new Date());
+    const minYear = Math.min(year, today.year - 10);
+    els.dateYear.innerHTML = "";
+    for (let y = today.year; y >= minYear; y--) {
+        const opt = document.createElement("option");
+        opt.value = String(y);
+        opt.textContent = String(y);
+        els.dateYear.appendChild(opt);
+    }
+}
+
+function populateDaySelect(year, month, selectedDay) {
+    const numDays = daysInMonth(year, month);
+    els.dateDay.innerHTML = "";
+    for (let d = 1; d <= numDays; d++) {
+        const opt = document.createElement("option");
+        opt.value = String(d);
+        opt.textContent = String(d);
+        els.dateDay.appendChild(opt);
+    }
+    els.dateDay.value = String(Math.min(selectedDay, numDays));
+}
+
+function setDateControls(year, month, day) {
+    ensureYearOption(year);
+    els.dateYear.value = String(year);
+    els.dateMonth.value = String(month);
+    populateDaySelect(year, month, day);
+}
+
+function selectedDateFromControls() {
+    return {
+        year: Number(els.dateYear.value),
+        month: Number(els.dateMonth.value),
+        day: Number(els.dateDay.value),
+    };
+}
+
+function setDateStatus(text, state) {
+    els.dateStatus.textContent = text;
+    if (state) {
+        els.dateStatus.setAttribute("data-state", state);
+    } else {
+        els.dateStatus.removeAttribute("data-state");
+    }
+}
+
+function applyDateChange(year, month, day) {
+    // Re-validate/re-sync the controls every time (not just on direct
+    // input) since a day that was valid for the old month/year — or past
+    // today — might not be anymore (e.g. switching from Jan 31 to Feb, or
+    // the next-day arrow walking past today).
+    const clamped = clampToToday(year, month, day);
+    setDateControls(clamped.year, clamped.month, clamped.day);
+
+    const today = pacificDateParts(new Date());
+    const isToday = clamped.year === today.year && clamped.month === today.month && clamped.day === today.day;
+    els.dateNext.disabled = isToday;
+
+    if (isToday) {
+        chartDate = null;
+        dayHistory = null;
+        setDateStatus("");
+        if (latest) render();
+        return;
+    }
+
+    const dateString = `${clamped.year}-${String(clamped.month).padStart(2, "0")}-${String(clamped.day).padStart(2, "0")}`;
+    chartDate = dateString;
+    fetchDayHistory(dateString);
+}
+
+function shiftChartDate(deltaDays) {
+    const { year, month, day } = selectedDateFromControls();
+    // Noon UTC sidesteps any DST-boundary ambiguity from just adding a day.
+    const base = new Date(Date.UTC(year, month - 1, day, 12));
+    base.setUTCDate(base.getUTCDate() + deltaDays);
+    applyDateChange(base.getUTCFullYear(), base.getUTCMonth() + 1, base.getUTCDate());
+}
+
+async function fetchDayHistory(dateString) {
+    setDateStatus(`Loading ${dateString}…`);
+    try {
+        const res = await fetch(`/api/history?date=${dateString}`);
+        if (!res.ok) throw new Error(`Request failed: ${res.status}`);
+        const data = await res.json();
+        if (chartDate !== dateString) return; // superseded by a newer selection
+        dayHistory = data;
+        setDateStatus(Array.isArray(data.points) && data.points.length > 0 ? "" : "No data available for that day.");
+        if (latest) render();
+    } catch (err) {
+        console.error(err);
+        if (chartDate !== dateString) return;
+        dayHistory = null;
+        setDateStatus("Unable to load that day's data.", "error");
+        if (latest) render();
+    }
+}
+
+function initDateNav() {
+    const today = pacificDateParts(new Date());
+
+    DATE_MONTH_NAMES.forEach((name, i) => {
+        const opt = document.createElement("option");
+        opt.value = String(i + 1);
+        opt.textContent = name;
+        els.dateMonth.appendChild(opt);
+    });
+
+    for (let y = today.year; y >= today.year - 10; y--) {
+        const opt = document.createElement("option");
+        opt.value = String(y);
+        opt.textContent = String(y);
+        els.dateYear.appendChild(opt);
+    }
+
+    setDateControls(today.year, today.month, today.day);
+    els.dateNext.disabled = true;
+
+    els.datePrev.addEventListener("click", () => shiftChartDate(-1));
+    els.dateNext.addEventListener("click", () => shiftChartDate(1));
+    for (const select of [els.dateYear, els.dateMonth, els.dateDay]) {
+        select.addEventListener("change", () => {
+            const { year, month, day } = selectedDateFromControls();
+            applyDateChange(year, month, day);
+        });
+    }
+}
+
 els.unitToggle.addEventListener("click", () => {
     useMetric = !useMetric;
     localStorage.setItem("units", useMetric ? "metric" : "imperial");
@@ -851,6 +1052,8 @@ els.tiles.pressure.pressureTickLabels = addTickLabels(
     pressureRing,
     Object.fromEntries(PRESSURE_TICK_DEGS.map((deg) => [deg, ""]))
 );
+
+initDateNav();
 
 // Staggered so the two initial requests don't land in the same second and
 // trip Ambient Weather's per-second rate limit.
