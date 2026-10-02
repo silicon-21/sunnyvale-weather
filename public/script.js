@@ -42,6 +42,7 @@ const els = {
     dateStatus: document.getElementById("date-status"),
     datePrev: document.getElementById("date-prev"),
     dateNext: document.getElementById("date-next"),
+    dateToday: document.getElementById("date-today"),
     dateMonth: document.getElementById("date-month"),
     dateDay: document.getElementById("date-day"),
     dateYear: document.getElementById("date-year"),
@@ -192,41 +193,54 @@ function renderYesterdayDelta(tile, tempUnit) {
 }
 
 function renderTempRange(tile, tempUnit) {
-    setRangeRow(tile, "today", history?.todayLow, history?.todayHigh, tempUnit);
-
-    // Only render the month row once the spreadsheet fetch has actually
-    // succeeded at least once — otherwise this would silently collapse to
-    // just today's (much narrower) range and look like a real month answer.
-    if (!monthRain) {
-        setRangeRow(tile, "month", null, null, tempUnit);
-        return;
-    }
-
     // Month range = spreadsheet's high/low through yesterday, widened by
     // today's own live high/low — same "spreadsheet through yesterday plus
     // today live" split used for month rain, for the same reason (avoids a
     // bad same-day spreadsheet row skewing the month). On the 1st of the
     // month there's no "through yesterday" data yet, so this naturally
     // collapses to just today's range, which is correct in that case.
-    let monthLow = monthRain.monthLowThroughYesterdayF;
-    let monthHigh = monthRain.monthHighThroughYesterdayF;
-    if (typeof history?.todayLow === "number") {
-        monthLow = typeof monthLow === "number" ? Math.min(monthLow, history.todayLow) : history.todayLow;
+    let monthLow = null;
+    let monthHigh = null;
+    if (monthRain) {
+        monthLow = monthRain.monthLowThroughYesterdayF;
+        monthHigh = monthRain.monthHighThroughYesterdayF;
+        if (typeof history?.todayLow === "number") {
+            monthLow = typeof monthLow === "number" ? Math.min(monthLow, history.todayLow) : history.todayLow;
+        }
+        if (typeof history?.todayHigh === "number") {
+            monthHigh = typeof monthHigh === "number" ? Math.max(monthHigh, history.todayHigh) : history.todayHigh;
+        }
     }
-    if (typeof history?.todayHigh === "number") {
-        monthHigh = typeof monthHigh === "number" ? Math.max(monthHigh, history.todayHigh) : history.todayHigh;
-    }
-    setRangeRow(tile, "month", monthLow, monthHigh, tempUnit);
+
+    // Today's bar is scaled and positioned within the month's range once
+    // that's known, so it reads as "today sits here within the month" —
+    // until then (the spreadsheet-backed month data loads later than
+    // today's live reading) it just stays at its initial full width rather
+    // than flash a scaled bar with nothing yet to scale against. The month
+    // row itself is never scaled — it's always the full-width reference.
+    const scale =
+        typeof monthLow === "number" && typeof monthHigh === "number" && monthHigh > monthLow
+            ? { min: monthLow, max: monthHigh }
+            : null;
+    setRangeRow(tile, "today", history?.todayLow, history?.todayHigh, tempUnit, scale);
+
+    // Only render the month row once the spreadsheet fetch has actually
+    // succeeded at least once — otherwise this would silently collapse to
+    // just today's (much narrower) range and look like a real month answer.
+    setRangeRow(tile, "month", monthRain ? monthLow : null, monthRain ? monthHigh : null, tempUnit, null);
 }
 
-function setRangeRow(tile, range, lowF, highF, tempUnit) {
+function setRangeRow(tile, range, lowF, highF, tempUnit, scale) {
     const row = tile.querySelector(`.temp-range[data-range="${range}"]`);
+    const bar = row.querySelector(".range-bar");
     const lowEl = row.querySelector(".range-low");
     const highEl = row.querySelector(".range-high");
 
     if (typeof lowF !== "number" || typeof highF !== "number") {
         lowEl.textContent = "–";
         highEl.textContent = "–";
+        bar.style.removeProperty("--range-left");
+        bar.style.removeProperty("--range-right");
         return;
     }
 
@@ -234,6 +248,15 @@ function setRangeRow(tile, range, lowF, highF, tempUnit) {
     const high = useMetric ? fToC(highF) : highF;
     lowEl.textContent = `${formatFixed(low, 1)}${tempUnit}`;
     highEl.textContent = `${formatFixed(high, 1)}${tempUnit}`;
+
+    if (scale) {
+        const span = scale.max - scale.min;
+        bar.style.setProperty("--range-left", `${clamp(((lowF - scale.min) / span) * 100, 0, 100)}%`);
+        bar.style.setProperty("--range-right", `${clamp(((scale.max - highF) / span) * 100, 0, 100)}%`);
+    } else {
+        bar.style.removeProperty("--range-left");
+        bar.style.removeProperty("--range-right");
+    }
 }
 
 function renderWind(speedUnit) {
@@ -949,6 +972,7 @@ function applyDateChange(year, month, day) {
     const today = pacificDateParts(new Date());
     const isToday = clamped.year === today.year && clamped.month === today.month && clamped.day === today.day;
     els.dateNext.disabled = isToday;
+    els.dateToday.disabled = isToday;
 
     if (isToday) {
         chartDate = null;
@@ -969,6 +993,11 @@ function shiftChartDate(deltaDays) {
     const base = new Date(Date.UTC(year, month - 1, day, 12));
     base.setUTCDate(base.getUTCDate() + deltaDays);
     applyDateChange(base.getUTCFullYear(), base.getUTCMonth() + 1, base.getUTCDate());
+}
+
+function goToToday() {
+    const today = pacificDateParts(new Date());
+    applyDateChange(today.year, today.month, today.day);
 }
 
 async function fetchDayHistory(dateString) {
@@ -1009,9 +1038,11 @@ function initDateNav() {
 
     setDateControls(today.year, today.month, today.day);
     els.dateNext.disabled = true;
+    els.dateToday.disabled = true;
 
     els.datePrev.addEventListener("click", () => shiftChartDate(-1));
     els.dateNext.addEventListener("click", () => shiftChartDate(1));
+    els.dateToday.addEventListener("click", goToToday);
     for (const select of [els.dateYear, els.dateMonth, els.dateDay]) {
         select.addEventListener("change", () => {
             const { year, month, day } = selectedDateFromControls();

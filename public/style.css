@@ -334,12 +334,24 @@ body {
     position: relative;
     flex: 1;
     height: 1px;
-    background: var(--border-strong);
     margin-top: 20px;
 }
 
-.range-bar::before,
-.range-bar::after {
+/* Spans [--range-left, 100% - --range-right] of the track — both default to
+   0%, i.e. the full track, which is always true for the month row and is
+   today's row's own starting state (full-width) until there's a month range
+   to scale and position it against. */
+.range-fill {
+    position: absolute;
+    top: 0;
+    left: var(--range-left, 0%);
+    right: var(--range-right, 0%);
+    height: 1px;
+    background: var(--border-strong);
+}
+
+.range-fill::before,
+.range-fill::after {
     content: "";
     position: absolute;
     top: -4px;
@@ -348,11 +360,11 @@ body {
     background: var(--border-strong);
 }
 
-.range-bar::before {
+.range-fill::before {
     left: 0;
 }
 
-.range-bar::after {
+.range-fill::after {
     right: 0;
 }
 
@@ -366,11 +378,11 @@ body {
 }
 
 .range-low {
-    left: 0;
+    left: var(--range-left, 0%);
 }
 
 .range-high {
-    right: 0;
+    right: var(--range-right, 0%);
 }
 
 /* Wind */
@@ -556,7 +568,7 @@ body {
     padding: 8px 14px;
 }
 
-.date-nav-arrow:disabled {
+.date-nav .pill-button:disabled {
     opacity: 0.35;
     cursor: default;
 }
