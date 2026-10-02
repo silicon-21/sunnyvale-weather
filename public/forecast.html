@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Sunnyvale Weather &ndash; Forecast</title>
+    <link rel="stylesheet" href="style.css" />
+</head>
+
+<body>
+    <div class="banner-wrap">
+        <img class="banner" id="banner" src="banner.jpg" alt="Fog over the hills above Sunnyvale" />
+        <h1 class="banner-title">Sunnyvale Weather</h1>
+    </div>
+    <main class="dashboard">
+        <nav class="top-nav" aria-label="Sections">
+            <a class="top-nav-link" href="/">Dashboard</a>
+            <a class="top-nav-link" href="/forecast" aria-current="page">Forecast</a>
+        </nav>
+
+        <header class="dashboard-header">
+            <div class="heading">
+                <h2>Forecast</h2>
+            </div>
+            <div class="header-controls">
+                <button id="unit-toggle" class="pill-button" type="button" aria-label="Switch units">°F</button>
+                <button id="refresh-button" class="pill-button" type="button" aria-label="Refresh now">⟳</button>
+            </div>
+        </header>
+
+        <p id="status-line" class="status-line" role="status">Loading forecast&hellip;</p>
+
+        <section class="alerts" id="alerts-section" aria-live="polite" hidden></section>
+
+        <div class="forecast-days-row">
+            <button id="forecast-days-prev" class="pill-button forecast-days-arrow" type="button" aria-label="Scroll to earlier days">&larr;</button>
+            <div class="forecast-days-scroll">
+                <section class="forecast-days" id="forecast-days" aria-live="polite"></section>
+            </div>
+            <button id="forecast-days-next" class="pill-button forecast-days-arrow" type="button" aria-label="Scroll to later days">&rarr;</button>
+        </div>
+
+        <section class="forecast-detail" id="forecast-detail" aria-live="polite"></section>
+
+        <section class="history" id="hourly-section" aria-live="polite">
+            <article class="chart-card" data-chart="hourly-temp">
+                <h2>Hourly Temperature</h2>
+                <div class="chart-legend">
+                    <span class="legend-item"><span class="legend-swatch" style="--swatch: var(--chart-red)"></span>Temp</span>
+                    <span class="legend-item"><span class="legend-swatch" style="--swatch: var(--chart-green)"></span>Dew point</span>
+                </div>
+                <div class="chart-wrap">
+                    <svg class="chart-svg" preserveAspectRatio="none"></svg>
+                    <div class="chart-tooltip" hidden></div>
+                </div>
+                <div class="chart-xaxis"></div>
+            </article>
+
+            <article class="chart-card" data-chart="hourly-wind-speed">
+                <h2>Hourly Wind Speed</h2>
+                <div class="chart-wrap">
+                    <svg class="chart-svg" preserveAspectRatio="none"></svg>
+                    <div class="chart-tooltip" hidden></div>
+                </div>
+                <div class="chart-xaxis"></div>
+            </article>
+
+            <article class="chart-card" data-chart="hourly-wind-dir">
+                <h2>Hourly Wind Direction</h2>
+                <div class="chart-wrap">
+                    <svg class="chart-svg" preserveAspectRatio="none"></svg>
+                    <div class="chart-tooltip" hidden></div>
+                </div>
+                <div class="chart-xaxis"></div>
+            </article>
+
+            <article class="chart-card" data-chart="hourly-pop">
+                <h2>Chance of Precipitation</h2>
+                <div class="chart-wrap">
+                    <svg class="chart-svg" preserveAspectRatio="none"></svg>
+                    <div class="chart-tooltip" hidden></div>
+                </div>
+                <div class="chart-xaxis"></div>
+            </article>
+        </section>
+
+        <p class="last-updated" id="last-updated"></p>
+    </main>
+
+    <script src="chart.js"></script>
+    <script src="forecast.js"></script>
+</body>
+
+</html>

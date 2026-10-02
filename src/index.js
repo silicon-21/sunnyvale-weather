@@ -10,6 +10,17 @@
 const SHEETS_API_URL =
     "https://script.google.com/macros/s/AKfycbw0LodV_rPSxFXvf1jOOE-oYzU4jJq_-RagrsP8VMAbDmnMdNBf5PaHnf39GRt5dCN-4g/exec";
 
+// Approximate station location, used only to resolve the NWS forecast
+// gridpoint and active alerts — the National Weather Service's grid
+// resolution (~2.5km) makes a precise rooftop coordinate unnecessary.
+const STATION_LAT = 37.3688;
+const STATION_LON = -122.0363;
+
+// api.weather.gov asks every client to identify itself in the User-Agent
+// (no API key is used). This is a generic app identifier, not tied to any
+// individual.
+const NWS_USER_AGENT = "sunnyvale-weather-dashboard (Cloudflare Worker)";
+
 export default {
     async fetch(request, env) {
         const url = new URL(request.url);
@@ -28,6 +39,10 @@ export default {
 
         if (url.pathname === "/api/month-rain") {
             return handleMonthRain();
+        }
+
+        if (url.pathname === "/api/forecast") {
+            return handleForecast();
         }
 
         return env.ASSETS.fetch(request);
@@ -343,6 +358,108 @@ async function handleMonthRain() {
         200,
         { "cache-control": "public, max-age=3600" }
     );
+}
+
+// NWS's forecast is keyed off a gridpoint resolved from lat/lon, and active
+// alerts are queried directly by point — fetched in parallel since neither
+// depends on the other. The periods array is the only thing the client
+// needs for the day/night forecast cards; alerts come through as-is.
+async function handleForecast() {
+    const pointsUrl = `https://api.weather.gov/points/${STATION_LAT},${STATION_LON}`;
+    const alertsUrl = `https://api.weather.gov/alerts/active?point=${STATION_LAT},${STATION_LON}`;
+
+    const [pointsResult, alertsResult] = await Promise.all([fetchNws(pointsUrl), fetchNws(alertsUrl)]);
+
+    if (pointsResult.error) {
+        return jsonResponse({ error: pointsResult.error }, 502);
+    }
+
+    const forecastUrl = pointsResult.data?.properties?.forecast;
+    const forecastHourlyUrl = pointsResult.data?.properties?.forecastHourly;
+    if (!forecastUrl || !forecastHourlyUrl) {
+        return jsonResponse({ error: "NWS did not return a forecast gridpoint." }, 502);
+    }
+
+    const [forecastResult, forecastHourlyResult] = await Promise.all([fetchNws(forecastUrl), fetchNws(forecastHourlyUrl)]);
+    if (forecastResult.error) {
+        return jsonResponse({ error: forecastResult.error }, 502);
+    }
+
+    const periods = forecastResult.data?.properties?.periods ?? [];
+    // The hourly endpoint can briefly 500 even when the daily forecast
+    // succeeds — not worth failing the whole response over, since the day
+    // tiles/detail panel don't depend on it.
+    const hourlyPeriods = forecastHourlyResult.error ? [] : forecastHourlyResult.data?.properties?.periods ?? [];
+    const alerts = alertsResult.error ? [] : alertsResult.data?.features ?? [];
+
+    return jsonResponse(
+        {
+            periods: periods.map((p) => ({
+                name: p.name,
+                startTime: p.startTime,
+                endTime: p.endTime,
+                isDaytime: p.isDaytime,
+                temperature: p.temperature,
+                temperatureUnit: p.temperatureUnit,
+                probabilityOfPrecipitation: p.probabilityOfPrecipitation?.value ?? null,
+                windSpeed: p.windSpeed,
+                windDirection: p.windDirection,
+                icon: p.icon,
+                shortForecast: p.shortForecast,
+                detailedForecast: p.detailedForecast,
+            })),
+            hourlyPeriods: hourlyPeriods.map((p) => ({
+                startTime: p.startTime,
+                endTime: p.endTime,
+                temperature: p.temperature,
+                temperatureUnit: p.temperatureUnit,
+                dewpointF: fahrenheitFromNwsQuantity(p.dewpoint),
+                probabilityOfPrecipitation: p.probabilityOfPrecipitation?.value ?? null,
+                windSpeed: p.windSpeed,
+                windDirection: p.windDirection,
+                shortForecast: p.shortForecast,
+            })),
+            alerts: alerts.map((f) => ({
+                id: f.properties.id,
+                event: f.properties.event,
+                severity: f.properties.severity,
+                headline: f.properties.headline,
+                areaDesc: f.properties.areaDesc,
+                effective: f.properties.effective,
+                expires: f.properties.expires,
+                description: f.properties.description,
+                instruction: f.properties.instruction,
+            })),
+        },
+        200,
+        { "cache-control": "public, max-age=600" }
+    );
+}
+
+// NWS's hourly periods report dewpoint as a { value, unitCode } quantity
+// (wmoUnit:degC), unlike the whole-period temperature's plain-F convention —
+// normalized to °F here so the client only ever deals in one unit per field.
+function fahrenheitFromNwsQuantity(quantity) {
+    if (typeof quantity?.value !== "number") return null;
+    const isCelsius = typeof quantity.unitCode === "string" && quantity.unitCode.endsWith("degC");
+    return isCelsius ? (quantity.value * 9) / 5 + 32 : quantity.value;
+}
+
+async function fetchNws(url) {
+    let response;
+    try {
+        response = await fetch(url, {
+            headers: { "User-Agent": NWS_USER_AGENT, Accept: "application/geo+json" },
+        });
+    } catch (err) {
+        return { error: "Failed to reach the National Weather Service." };
+    }
+
+    if (!response.ok) {
+        return { error: `National Weather Service returned ${response.status}` };
+    }
+
+    return { data: await response.json() };
 }
 
 function jsonResponse(body, status, extraHeaders = {}) {

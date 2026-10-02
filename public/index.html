@@ -9,11 +9,19 @@
 </head>
 
 <body>
-    <img class="banner" id="banner" src="banner.jpg" alt="Fog over the hills above Sunnyvale" />
+    <div class="banner-wrap">
+        <img class="banner" id="banner" src="banner.jpg" alt="Fog over the hills above Sunnyvale" />
+        <h1 class="banner-title">Sunnyvale Weather</h1>
+    </div>
     <main class="dashboard">
+        <nav class="top-nav" aria-label="Sections">
+            <a class="top-nav-link" href="/" aria-current="page">Dashboard</a>
+            <a class="top-nav-link" href="/forecast">Forecast</a>
+        </nav>
+
         <header class="dashboard-header">
             <div class="heading">
-                <h1>Sunnyvale Weather</h1>
+                <h2>Current Conditions</h2>
             </div>
             <div class="header-controls">
                 <button id="unit-toggle" class="pill-button" type="button" aria-label="Switch units">°F</button>
@@ -202,6 +210,7 @@
         </section>
     </main>
 
+    <script src="chart.js"></script>
     <script src="script.js"></script>
 </body>
 
