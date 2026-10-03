@@ -346,3 +346,9 @@ els.monthSelect.value = String(today.month);
 els.yearSelect.value = String(today.year);
 updateControlsVisibility();
 fetchHistory();
+
+// This page has no other reason to fetch live station data, so the banner
+// swap (shared with the dashboard/forecast pages via banner.js) runs on its
+// own independent poll.
+fetchCurrentForBanner();
+setInterval(fetchCurrentForBanner, BANNER_POLL_INTERVAL_MS);

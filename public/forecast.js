@@ -1,11 +1,4 @@
 const REFRESH_INTERVAL_MS = 10 * 60_000;
-// Matches the dashboard's own refresh cadence so both tabs flip the banner
-// at roughly the same time, off the same live station reading.
-const CURRENT_REFRESH_INTERVAL_MS = 60_000;
-
-const BANNER_NORMAL_SRC = "banner.jpg";
-const BANNER_HEAT_SRC = "heatabnormal.png";
-const HEAT_BANNER_THRESHOLD_F = 90;
 
 // Same stops as the dashboard's temperature ring, so a forecast high reads
 // as the same color a live reading of that temperature would.
@@ -30,7 +23,6 @@ const els = {
     forecastDaysPrev: document.getElementById("forecast-days-prev"),
     forecastDaysNext: document.getElementById("forecast-days-next"),
     forecastDetail: document.getElementById("forecast-detail"),
-    banner: document.getElementById("banner"),
 };
 
 let useMetric = localStorage.getItem("units") === "metric";
@@ -67,29 +59,6 @@ function tempColor(tempF) {
             const rgb = c0.map((v, idx) => Math.round(v + (c1[idx] - v) * t));
             return rgbToHex(rgb);
         }
-    }
-}
-
-// Mirrors the dashboard's own banner swap, off the same live station
-// reading — kept independent of the forecast fetch/render cycle so a slow
-// or failed NWS request never holds up the banner, and vice versa.
-function renderBanner(tempf) {
-    const isHeat = tempf >= HEAT_BANNER_THRESHOLD_F;
-    const targetSrc = isHeat ? BANNER_HEAT_SRC : BANNER_NORMAL_SRC;
-    if (!els.banner.getAttribute("src").endsWith(targetSrc)) {
-        els.banner.src = targetSrc;
-        els.banner.alt = isHeat ? "Heat abnormal" : "Fog over the hills above Sunnyvale";
-    }
-}
-
-async function fetchCurrentForBanner() {
-    try {
-        const res = await fetch("/api/current");
-        if (!res.ok) return;
-        const data = await res.json();
-        if (typeof data?.tempf === "number") renderBanner(data.tempf);
-    } catch (err) {
-        // Non-critical — banner just stays on whatever it was last set to.
     }
 }
 
@@ -500,4 +469,4 @@ window.addEventListener("resize", updateForecastDaysArrows);
 fetchForecast();
 fetchCurrentForBanner();
 setInterval(fetchForecast, REFRESH_INTERVAL_MS);
-setInterval(fetchCurrentForBanner, CURRENT_REFRESH_INTERVAL_MS);
+setInterval(fetchCurrentForBanner, BANNER_POLL_INTERVAL_MS);
