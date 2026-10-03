@@ -10,6 +10,7 @@ const BANNER_NORMAL_SRC = "banner.jpg";
 const BANNER_HEAT_SRC = "heatabnormal.png";
 const HEAT_BANNER_THRESHOLD_F = 90;
 const BANNER_POLL_INTERVAL_MS = 60_000;
+const HEAT_ABNORMAL = "https://www.youtube.com/watch?v=b2NTglk9tvI";
 
 // Always keyed on raw °F so it doesn't flip based on the page's display unit.
 function renderBanner(tempf) {
@@ -22,6 +23,18 @@ function renderBanner(tempf) {
     if (!banner.getAttribute("src").endsWith(targetSrc)) {
         banner.src = targetSrc;
         banner.alt = isHeat ? "Heat abnormal" : "Fog over the hills above Sunnyvale";
+    }
+
+    // The banner is only a link to the music video while it's actually
+    // showing the heat-abnormal photo — an <a> with no href attribute isn't
+    // focusable or clickable, so this alone disables it the rest of the time.
+    const link = document.getElementById("banner-link");
+    if (link) {
+        if (isHeat) {
+            link.href = HEAT_ABNORMAL;
+        } else {
+            link.removeAttribute("href");
+        }
     }
 }
 

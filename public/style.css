@@ -90,6 +90,10 @@ body {
     position: relative;
 }
 
+.banner-link {
+    display: block;
+}
+
 .banner {
     width: 100%;
     height: clamp(160px, 28vw, 320px);
