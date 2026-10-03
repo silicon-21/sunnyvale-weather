@@ -106,7 +106,7 @@ function ensureChartHover(wrapEl) {
         tooltip.innerHTML = "";
         const timeEl = document.createElement("div");
         timeEl.className = "tooltip-time";
-        timeEl.textContent = formatClockTime(nearest.t);
+        timeEl.textContent = (state.tooltipTimeFormat ?? formatClockTime)(nearest.t);
         tooltip.appendChild(timeEl);
 
         for (const s of state.series) {
@@ -144,15 +144,33 @@ function ensureChartHover(wrapEl) {
     svg.addEventListener("pointerleave", hide);
 }
 
+// Width (in viewBox units) for one bar in a `mode: "bar"` series — derived
+// from the typical spacing between the chart's own points (so it adapts to
+// a month of daily bars vs. a year of them) rather than a fixed constant,
+// leaving a visible gap between bars.
+function barWidth(pts, scaleX, plotWidth) {
+    if (pts.length < 2) return plotWidth * 0.1;
+    const gaps = pts.slice(1).map((p, i) => scaleX(p.t) - scaleX(pts[i].t)).sort((a, b) => a - b);
+    const median = gaps[Math.floor(gaps.length / 2)];
+    return Math.max(median * 0.7, 1);
+}
+
 // Generic time-series renderer shared by every chart on both pages. `series`
-// entries are { color, label, getValue(point), area?, mode?, format? }.
+// entries are { color, label, getValue(point), area?, mode?, format?, opacity? }.
+// `opacity` (line mode only) fades a series — e.g. a climatological average
+// plotted in the same hue as its recorded counterpart, but lighter.
 // Per-series `mode: "scatter"` (overriding the chart-level default) draws
 // dots instead of a connected line — used for wind direction, which wraps at
 // 0/360, and for event-like readings (a gust, say) rather than a continuous
-// quantity. `format` overrides the chart-level `yFormat` for that series'
-// tooltip row only — used when series share one scale but not a unit (rain
-// total vs. rate). `xAxisFormat` overrides the default fixed day-boundary
-// x-axis labels — see renderXAxisLabels.
+// quantity. `mode: "bar"` draws one rect per point, anchored to the 0
+// baseline — used for daily/monthly rainfall totals, where each point is a
+// discrete period rather than a continuous reading. `format` overrides the
+// chart-level `yFormat` for that series' tooltip row only — used when series
+// share one scale but not a unit (rain total vs. rate). `xAxisFormat`
+// overrides the default fixed day-boundary x-axis labels — see
+// renderXAxisLabels. `tooltipTimeFormat` overrides the tooltip's own time
+// line (default: a clock time) — needed wherever a point represents a whole
+// day rather than a moment within one.
 function renderTimeChart({
     wrapEl,
     xaxisEl,
@@ -163,6 +181,7 @@ function renderTimeChart({
     yFormat,
     yAxisFormat,
     xAxisFormat,
+    tooltipTimeFormat,
     mode = "line",
     yDomain: yDomainOverride,
     yTicks: yTicksOverride,
@@ -214,6 +233,25 @@ function renderTimeChart({
             continue;
         }
 
+        if (seriesMode === "bar") {
+            const width = barWidth(pts, scaleX, plotRight - plotLeft);
+            const baseline = scaleY(Math.max(yDomain[0], 0));
+            for (const p of pts) {
+                const cx = scaleX(p.t);
+                const y = scaleY(p.v);
+                const rect = svgEl("rect", {
+                    x: cx - width / 2,
+                    y: Math.min(y, baseline),
+                    width,
+                    height: Math.abs(baseline - y),
+                    class: "chart-bar",
+                });
+                rect.style.fill = s.color;
+                svg.appendChild(rect);
+            }
+            continue;
+        }
+
         if (s.area) {
             const baseline = scaleY(Math.max(yDomain[0], 0));
             let d = `M ${scaleX(pts[0].t)},${baseline}`;
@@ -228,6 +266,7 @@ function renderTimeChart({
         for (const p of pts.slice(1)) d += ` L ${scaleX(p.t)},${scaleY(p.v)}`;
         const path = svgEl("path", { d, class: "chart-series-line", "vector-effect": "non-scaling-stroke" });
         path.style.stroke = s.color;
+        if (typeof s.opacity === "number") path.style.opacity = s.opacity;
         svg.appendChild(path);
     }
 
@@ -242,7 +281,7 @@ function renderTimeChart({
     });
     svg.appendChild(crosshair);
 
-    wrapEl._chartState = { xDomain, points, series, scaleX, yFormat, crosshair, plotLeft, plotRight };
+    wrapEl._chartState = { xDomain, points, series, scaleX, yFormat, tooltipTimeFormat, crosshair, plotLeft, plotRight };
     ensureChartHover(wrapEl);
 
     renderXAxisLabels(xaxisEl, xDomain, xAxisFormat);

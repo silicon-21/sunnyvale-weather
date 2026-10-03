@@ -45,6 +45,10 @@ export default {
             return handleForecast();
         }
 
+        if (url.pathname === "/api/history-range") {
+            return handleHistoryRange(url.searchParams.get("start"), url.searchParams.get("end"));
+        }
+
         return env.ASSETS.fetch(request);
     },
 };
@@ -354,6 +358,38 @@ async function handleMonthRain() {
             monthHighThroughYesterdayF: high,
             monthLowThroughYesterdayF: low,
             monthStart,
+        },
+        200,
+        { "cache-control": "public, max-age=3600" }
+    );
+}
+
+// Daily high/mean/low temperature and precipitation over an arbitrary date
+// range, sourced from the same hand-maintained spreadsheet as the rain
+// tiles — Ambient Weather's own history endpoint only retains a rolling
+// window, not the years of daily data the History tab's month/year charts
+// need. `start`/`end` are both required "YYYY-MM-DD" strings.
+async function handleHistoryRange(start, end) {
+    const isDateString = (s) => typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s);
+    if (!isDateString(start) || !isDateString(end)) {
+        return jsonResponse({ error: "start and end must be YYYY-MM-DD dates." }, 400);
+    }
+
+    const { rows, error } = await fetchSheetRows(start, end);
+    if (error) return jsonResponse({ error }, 502);
+
+    return jsonResponse(
+        {
+            days: rows.map((row) => ({
+                date: row["Date"],
+                highF: typeof row["High Temp (F)"] === "number" ? row["High Temp (F)"] : null,
+                meanF: typeof row["Daily Mean (F)"] === "number" ? row["Daily Mean (F)"] : null,
+                lowF: typeof row["Low Temp (F)"] === "number" ? row["Low Temp (F)"] : null,
+                precipIn: typeof row["Precip (in)"] === "number" ? row["Precip (in)"] : null,
+                avgHighF: typeof row["Avg High Temp (F)"] === "number" ? row["Avg High Temp (F)"] : null,
+                avgMeanF: typeof row["Avg Daily Mean(F)"] === "number" ? row["Avg Daily Mean(F)"] : null,
+                avgLowF: typeof row["Avg Low Temp (F)"] === "number" ? row["Avg Low Temp (F)"] : null,
+            })),
         },
         200,
         { "cache-control": "public, max-age=3600" }

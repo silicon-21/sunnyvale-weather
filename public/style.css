@@ -638,6 +638,31 @@ body {
     color: var(--status-critical);
 }
 
+.history-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin-top: 20px;
+}
+
+.range-mode {
+    display: flex;
+    gap: 8px;
+}
+
+.pill-button[aria-pressed="true"] {
+    background: var(--text-primary);
+    color: var(--page-plane);
+    border-color: var(--text-primary);
+}
+
+.history-controls .pill-button:disabled {
+    opacity: 0.35;
+    cursor: default;
+}
+
 /* History charts */
 
 .history {
@@ -721,6 +746,10 @@ body {
 }
 
 .chart-svg .chart-scatter-dot {
+    stroke: none;
+}
+
+.chart-svg .chart-bar {
     stroke: none;
 }
 

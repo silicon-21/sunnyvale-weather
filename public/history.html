@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Sunnyvale Weather &ndash; History</title>
+    <link rel="stylesheet" href="style.css" />
+</head>
+
+<body>
+    <div class="banner-wrap">
+        <img class="banner" id="banner" src="banner.jpg" alt="Fog over the hills above Sunnyvale" />
+        <h1 class="banner-title">Sunnyvale Weather</h1>
+    </div>
+    <main class="dashboard">
+        <nav class="top-nav" aria-label="Sections">
+            <a class="top-nav-link" href="/">Dashboard</a>
+            <a class="top-nav-link" href="/forecast">Forecast</a>
+            <a class="top-nav-link" href="/history" aria-current="page">History</a>
+        </nav>
+
+        <header class="dashboard-header">
+            <div class="heading">
+                <h2>History</h2>
+            </div>
+            <div class="header-controls">
+                <button id="unit-toggle" class="pill-button" type="button" aria-label="Switch units">°F</button>
+            </div>
+        </header>
+
+        <p id="status-line" class="status-line" role="status">Loading history&hellip;</p>
+
+        <div class="history-controls">
+            <div class="range-mode" role="group" aria-label="Range type">
+                <button id="range-mode-month" class="pill-button" type="button" aria-pressed="true">Month</button>
+                <button id="range-mode-year" class="pill-button" type="button" aria-pressed="false">Year</button>
+            </div>
+            <button id="history-prev" class="pill-button date-nav-arrow" type="button" aria-label="Previous period">&larr;</button>
+            <div class="date-select">
+                <select id="history-month" aria-label="Month"></select>
+                <select id="history-year" aria-label="Year"></select>
+            </div>
+            <button id="history-next" class="pill-button date-nav-arrow" type="button" aria-label="Next period">&rarr;</button>
+        </div>
+
+        <section class="history" id="history-charts" aria-live="polite">
+            <article class="chart-card" data-chart="history-temp">
+                <h2>Temperature</h2>
+                <div class="chart-legend">
+                    <span class="legend-item"><span class="legend-swatch" style="--swatch: var(--chart-red)"></span>High</span>
+                    <span class="legend-item"><span class="legend-swatch" style="--swatch: var(--chart-secondary)"></span>Mean</span>
+                    <span class="legend-item"><span class="legend-swatch" style="--swatch: var(--accent-rain)"></span>Low</span>
+                </div>
+                <div class="chart-wrap">
+                    <svg class="chart-svg" preserveAspectRatio="none"></svg>
+                    <div class="chart-tooltip" hidden></div>
+                </div>
+                <div class="chart-xaxis"></div>
+            </article>
+
+            <article class="chart-card" data-chart="history-rain">
+                <h2>Rainfall</h2>
+                <div class="chart-wrap">
+                    <svg class="chart-svg" preserveAspectRatio="none"></svg>
+                    <div class="chart-tooltip" hidden></div>
+                </div>
+                <div class="chart-xaxis"></div>
+            </article>
+        </section>
+    </main>
+
+    <script src="chart.js"></script>
+    <script src="history.js"></script>
+</body>
+
+</html>
