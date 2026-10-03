@@ -121,8 +121,6 @@ function setStatus(text, state) {
 }
 
 function render() {
-    if (!latest) return;
-
     const tempUnit = useMetric ? "°C" : "°F";
     const speedUnit = useMetric ? "km/h" : "mph";
     const pressureUnit = useMetric ? "hPa" : "inHg";
@@ -130,7 +128,7 @@ function render() {
 
     els.unitToggle.textContent = tempUnit;
 
-    renderBanner(latest.tempf);
+    renderBanner(latest?.tempf);
     renderTemp(tempUnit);
     renderWind(speedUnit);
     renderPressure(pressureUnit);
@@ -141,18 +139,25 @@ function render() {
     updateLastUpdatedLabel();
 }
 
+// Each field is checked individually, not just `latest` as a whole — a
+// console that's lost radio contact with the outdoor sensor array still
+// reports baromrelin (see fetchCurrent), so `latest` can be a real, fresh
+// object missing tempf/humidity/etc. specifically.
 function renderTemp(tempUnit) {
     const tile = els.tiles.temp;
-    const temp = useMetric ? fToC(latest.tempf) : latest.tempf;
-    const feelsLike = useMetric ? fToC(latest.feelsLike) : latest.feelsLike;
-    const dewPoint = useMetric ? fToC(latest.dewPoint) : latest.dewPoint;
+    const hasTemp = typeof latest?.tempf === "number";
+    const temp = hasTemp ? (useMetric ? fToC(latest.tempf) : latest.tempf) : null;
+    const hasFeelsLike = typeof latest?.feelsLike === "number";
+    const feelsLike = hasFeelsLike ? (useMetric ? fToC(latest.feelsLike) : latest.feelsLike) : null;
+    const hasDewPoint = typeof latest?.dewPoint === "number";
+    const dewPoint = hasDewPoint ? (useMetric ? fToC(latest.dewPoint) : latest.dewPoint) : null;
 
-    tile.querySelector(".temp-ring .num").textContent = formatFixed(temp, 1);
+    tile.querySelector(".temp-ring .num").textContent = hasTemp ? formatFixed(temp, 1) : "–";
     tile.querySelector(".temp-ring .unit").textContent = tempUnit;
-    tile.querySelector(".temp-ring").style.setProperty("--temp-color", tempColor(latest.tempf));
-    tile.querySelector(".humidity").textContent = `${round(latest.humidity, 0)}%`;
-    tile.querySelector(".dew-point").textContent = `${formatFixed(dewPoint, 1)}${tempUnit}`;
-    tile.querySelector(".feels-like strong").textContent = `${formatFixed(feelsLike, 1)}${tempUnit}`;
+    tile.querySelector(".temp-ring").style.setProperty("--temp-color", hasTemp ? tempColor(latest.tempf) : "var(--text-muted)");
+    tile.querySelector(".humidity").textContent = typeof latest?.humidity === "number" ? `${round(latest.humidity, 0)}%` : "–";
+    tile.querySelector(".dew-point").textContent = hasDewPoint ? `${formatFixed(dewPoint, 1)}${tempUnit}` : "–";
+    tile.querySelector(".feels-like strong").textContent = hasFeelsLike ? `${formatFixed(feelsLike, 1)}${tempUnit}` : "–";
 
     renderYesterdayDelta(tile, tempUnit);
     renderTempRange(tile, tempUnit);
@@ -160,7 +165,7 @@ function renderTemp(tempUnit) {
 
 function renderYesterdayDelta(tile, tempUnit) {
     const el = tile.querySelector(".yesterday-delta");
-    if (!history || typeof history.yesterdayTempF !== "number") {
+    if (typeof latest?.tempf !== "number" || !history || typeof history.yesterdayTempF !== "number") {
         el.textContent = "–";
         return;
     }
@@ -263,13 +268,19 @@ function separateRangeLabels(lowEl, highEl) {
 
 function renderWind(speedUnit) {
     const tile = els.tiles.wind;
-    const windSpeed = useMetric ? mphToKmh(latest.windspeedmph) : latest.windspeedmph;
-    const windGust = useMetric ? mphToKmh(latest.windgustmph) : latest.windgustmph;
+    const hasSpeed = typeof latest?.windspeedmph === "number";
+    const windSpeed = hasSpeed ? (useMetric ? mphToKmh(latest.windspeedmph) : latest.windspeedmph) : null;
+    const hasGust = typeof latest?.windgustmph === "number";
+    const windGust = hasGust ? (useMetric ? mphToKmh(latest.windgustmph) : latest.windgustmph) : null;
 
-    tile.querySelector(".num").textContent = round(windSpeed);
+    tile.querySelector(".num").textContent = hasSpeed ? round(windSpeed) : "–";
     tile.querySelector(".unit").textContent = speedUnit;
-    tile.querySelector(".gust").textContent = `G ${round(windGust)} ${speedUnit}`;
-    tile.querySelector(".compass").style.setProperty("--deg", `${latest.winddir}deg`);
+    tile.querySelector(".gust").textContent = hasGust ? `G ${round(windGust)} ${speedUnit}` : `G – ${speedUnit}`;
+    // Missing winddir just leaves the compass arrow at its last known
+    // position rather than snapping it to a misleading 0deg.
+    if (typeof latest?.winddir === "number") {
+        tile.querySelector(".compass").style.setProperty("--deg", `${latest.winddir}deg`);
+    }
 }
 
 function pressureAngleToInHg(deg) {
@@ -278,17 +289,22 @@ function pressureAngleToInHg(deg) {
 
 function renderPressure(pressureUnit) {
     const tile = els.tiles.pressure;
-    const pressure = useMetric ? inHgToHpa(latest.baromrelin) : latest.baromrelin;
-    const angle = clamp(
-        ((latest.baromrelin - PRESSURE_MID_INHG) / PRESSURE_HALF_RANGE_INHG) * 90,
-        -PRESSURE_MAX_ANGLE,
-        PRESSURE_MAX_ANGLE
-    );
-
+    const hasPressure = typeof latest?.baromrelin === "number";
     const pressurePlaces = useMetric ? 0 : 2;
-    tile.querySelector(".pressure-value .num").textContent = formatFixed(pressure, pressurePlaces);
+
+    if (hasPressure) {
+        const pressure = useMetric ? inHgToHpa(latest.baromrelin) : latest.baromrelin;
+        const angle = clamp(
+            ((latest.baromrelin - PRESSURE_MID_INHG) / PRESSURE_HALF_RANGE_INHG) * 90,
+            -PRESSURE_MAX_ANGLE,
+            PRESSURE_MAX_ANGLE
+        );
+        tile.querySelector(".pressure-value .num").textContent = formatFixed(pressure, pressurePlaces);
+        tile.querySelector(".needle").style.setProperty("--deg", `${angle}deg`);
+    } else {
+        tile.querySelector(".pressure-value .num").textContent = "–";
+    }
     tile.querySelector(".pressure-value .unit").textContent = pressureUnit;
-    tile.querySelector(".needle").style.setProperty("--deg", `${angle}deg`);
 
     for (const label of tile.pressureTickLabels) {
         const valueInHg = pressureAngleToInHg(label.deg);
@@ -300,20 +316,32 @@ function renderPressure(pressureUnit) {
 function renderRain(rainUnit) {
     const tile = els.tiles.rain;
     const jars = tile.querySelectorAll(".jar");
+    const hasDaily = typeof latest?.dailyrainin === "number";
 
-    setJar(jars[0], latest.dailyrainin, RAIN_JAR_MAX_IN.day, rainUnit);
+    if (hasDaily) {
+        setJar(jars[0], latest.dailyrainin, RAIN_JAR_MAX_IN.day, rainUnit);
+    } else {
+        clearJar(jars[0]);
+    }
 
     // Month total = spreadsheet sum through yesterday + today's live station
     // reading, rather than trusting the station's own running monthly total,
     // since the spreadsheet and station occasionally disagree after a
-    // station hiccup.
+    // station hiccup. Today's own contribution just drops out (treated as 0)
+    // when the live reading is unavailable, rather than blocking the whole
+    // jar on it.
     if (monthRain && typeof monthRain.monthToYesterdayIn === "number") {
-        setJar(jars[1], monthRain.monthToYesterdayIn + latest.dailyrainin, RAIN_JAR_MAX_IN.month, rainUnit);
+        setJar(jars[1], monthRain.monthToYesterdayIn + (hasDaily ? latest.dailyrainin : 0), RAIN_JAR_MAX_IN.month, rainUnit);
     }
 
     if (seasonRain && typeof seasonRain.seasonRainIn === "number") {
         setJar(jars[2], seasonRain.seasonRainIn, RAIN_JAR_MAX_IN.season, rainUnit);
     }
+}
+
+function clearJar(jarEl) {
+    jarEl.querySelector(".jar-fill").style.setProperty("--fill", "4%");
+    jarEl.querySelector(".jar-value").textContent = "–";
 }
 
 function setJar(jarEl, amountIn, maxIn, rainUnit) {
@@ -326,10 +354,11 @@ function setJar(jarEl, amountIn, maxIn, rainUnit) {
 
 function renderSolar() {
     const tile = els.tiles.solar;
-    const corePercent = clamp((latest.solarradiation / SOLAR_MAX_WM2) * 100, 0, 100);
+    const hasSolar = typeof latest?.solarradiation === "number";
+    const corePercent = hasSolar ? clamp((latest.solarradiation / SOLAR_MAX_WM2) * 100, 0, 100) : 0;
 
     tile.querySelector(".sun-core").style.setProperty("--core-size", `${corePercent}%`);
-    tile.querySelector(".solar-value .num").textContent = round(latest.solarradiation, 0);
+    tile.querySelector(".solar-value .num").textContent = hasSolar ? round(latest.solarradiation, 0) : "–";
 
     const hoursEl = tile.querySelector(".sunshine-hours .num");
     hoursEl.textContent =
@@ -585,17 +614,26 @@ async function fetchCurrent() {
         const res = await fetch("/api/current");
         if (!res.ok) throw new Error(`Request failed: ${res.status}`);
         const data = await res.json();
-        if (!data || typeof data.tempf !== "number" || typeof data.dateutc !== "number") {
+        // baromrelin is measured by the console itself, so it's still
+        // reported even when the console has lost radio contact with the
+        // outdoor sensor array (which is exactly when tempf and the rest go
+        // missing) — a far more reliable "is the station still reporting at
+        // all" signal than tempf.
+        if (!data || typeof data.baromrelin !== "number" || typeof data.dateutc !== "number") {
             throw new Error("Unexpected response shape");
         }
         latest = data;
         readingAt = data.dateutc;
         setStatus("");
-        render();
     } catch (err) {
         console.error(err);
         setStatus("Unable to load weather data right now.", "error");
     }
+    // Always re-render, success or failure — the charts below come from
+    // /api/history independently of this fetch, and the tiles above degrade
+    // to "–" placeholders on their own rather than leaving the whole page
+    // stuck on its initial state.
+    render();
 }
 
 async function fetchHistory() {
@@ -607,7 +645,7 @@ async function fetchHistory() {
         console.error(err);
         return;
     }
-    if (latest) render();
+    render();
 }
 
 async function fetchSeasonRain() {
@@ -620,7 +658,7 @@ async function fetchSeasonRain() {
         setTimeout(fetchSeasonRain, SHEET_RAIN_RETRY_DELAY_MS);
         return;
     }
-    if (latest) render();
+    render();
 }
 
 async function fetchMonthRain() {
@@ -633,7 +671,7 @@ async function fetchMonthRain() {
         setTimeout(fetchMonthRain, SHEET_RAIN_RETRY_DELAY_MS);
         return;
     }
-    if (latest) render();
+    render();
 }
 
 // ---- Graph date navigation ----
@@ -748,7 +786,7 @@ function applyDateChange(year, month, day) {
         chartDate = null;
         dayHistory = null;
         setDateStatus("");
-        if (latest) render();
+        render();
         return;
     }
 
@@ -779,13 +817,13 @@ async function fetchDayHistory(dateString) {
         if (chartDate !== dateString) return; // superseded by a newer selection
         dayHistory = data;
         setDateStatus(Array.isArray(data.points) && data.points.length > 0 ? "" : "No data available for that day.");
-        if (latest) render();
+        render();
     } catch (err) {
         console.error(err);
         if (chartDate !== dateString) return;
         dayHistory = null;
         setDateStatus("Unable to load that day's data.", "error");
-        if (latest) render();
+        render();
     }
 }
 
