@@ -18,11 +18,18 @@ const els = {
     yearSelect: document.getElementById("history-year"),
     historyPrev: document.getElementById("history-prev"),
     historyNext: document.getElementById("history-next"),
+    historyTableSection: document.getElementById("history-table-section"),
+    historyTableBody: document.getElementById("history-table-body"),
+    historyTableFoot: document.getElementById("history-table-foot"),
 };
 
 let useMetric = localStorage.getItem("units") === "metric";
 let rangeMode = "month"; // "month" | "year"
 let days = [];
+// Per-day record low/high/precip (and the year each happened), across every
+// year on record for the selected month — null in year mode, where the
+// table doesn't show. Keyed by day-of-month via recordsByDay() below.
+let monthRecords = null;
 
 function fToC(f) {
     return (f - 32) * (5 / 9);
@@ -257,11 +264,118 @@ function clearCharts() {
     }
 }
 
+function dayOfMonth(dateString) {
+    return Number(dateString.slice(8, 10));
+}
+
+function tempCellText(f) {
+    if (typeof f !== "number") return "–";
+    const tempUnit = useMetric ? "°C" : "°F";
+    return `${formatFixed(useMetric ? fToC(f) : f, 1)}${tempUnit}`;
+}
+
+function rainCellText(inches) {
+    if (typeof inches !== "number") return "–";
+    const rainUnit = useMetric ? "mm" : "in";
+    const places = useMetric ? 1 : 2;
+    return `${formatFixed(useMetric ? inToMm(inches) : inches, places)} ${rainUnit}`;
+}
+
+function average(values) {
+    const nums = values.filter((v) => typeof v === "number" && !Number.isNaN(v));
+    return nums.length > 0 ? nums.reduce((sum, v) => sum + v, 0) / nums.length : null;
+}
+
+function total(values) {
+    return values.filter((v) => typeof v === "number" && !Number.isNaN(v)).reduce((sum, v) => sum + v, 0);
+}
+
+function appendCell(row, text) {
+    const td = document.createElement("td");
+    td.textContent = text;
+    row.appendChild(td);
+}
+
+// A record cell carries both the value and the year it happened, the year
+// in a smaller/muted span — appendCell alone can't express that.
+function appendRecordCell(row, value, year, formatFn) {
+    const td = document.createElement("td");
+    if (typeof value === "number") {
+        td.appendChild(document.createTextNode(formatFn(value)));
+        if (typeof year === "number") {
+            const yearSpan = document.createElement("span");
+            yearSpan.className = "record-year";
+            yearSpan.textContent = ` (${year})`;
+            td.appendChild(yearSpan);
+        }
+    } else {
+        td.textContent = "–";
+    }
+    row.appendChild(td);
+}
+
+function clearTable() {
+    els.historyTableSection.hidden = true;
+    els.historyTableBody.innerHTML = "";
+    els.historyTableFoot.innerHTML = "";
+}
+
+// The table only makes sense for a single month — a year's worth of rows
+// (365) would be unreadable — so it stays hidden in year mode regardless of
+// whether `days` has data.
+function renderHistoryTable() {
+    if (rangeMode !== "month" || days.length === 0) {
+        clearTable();
+        return;
+    }
+
+    els.historyTableSection.hidden = false;
+    els.historyTableBody.innerHTML = "";
+    els.historyTableFoot.innerHTML = "";
+
+    const recordsByDay = new Map((monthRecords ?? []).map((r) => [r.day, r]));
+
+    for (const d of days) {
+        const row = document.createElement("tr");
+        const record = recordsByDay.get(dayOfMonth(d.date));
+
+        appendCell(row, String(dayOfMonth(d.date)));
+        appendCell(row, tempCellText(d.highF));
+        appendCell(row, tempCellText(d.lowF));
+        appendCell(row, tempCellText(d.avgHighF));
+        appendCell(row, tempCellText(d.avgLowF));
+        appendRecordCell(row, record?.recordHighF, record?.recordHighYear, tempCellText);
+        appendRecordCell(row, record?.recordLowF, record?.recordLowYear, tempCellText);
+        appendCell(row, rainCellText(d.precipIn));
+        appendRecordCell(row, record?.recordPrecipIn, record?.recordPrecipYear, rainCellText);
+
+        els.historyTableBody.appendChild(row);
+    }
+
+    // Cumulative row: averages for the temperature columns, a total for
+    // rain — the record columns have no sensible single-row aggregate, so
+    // they're left blank rather than, say, the single coldest/hottest/
+    // wettest record of the month (which would read as "the record for the
+    // whole month" and overstate what it actually means).
+    const footRow = document.createElement("tr");
+    appendCell(footRow, "Month");
+    appendCell(footRow, tempCellText(average(days.map((d) => d.highF))));
+    appendCell(footRow, tempCellText(average(days.map((d) => d.lowF))));
+    appendCell(footRow, tempCellText(average(days.map((d) => d.avgHighF))));
+    appendCell(footRow, tempCellText(average(days.map((d) => d.avgLowF))));
+    appendCell(footRow, "–");
+    appendCell(footRow, "–");
+    appendCell(footRow, rainCellText(total(days.map((d) => d.precipIn))));
+    appendCell(footRow, "–");
+    els.historyTableFoot.appendChild(footRow);
+}
+
 function render() {
     els.unitToggle.textContent = useMetric ? "°C" : "°F";
 
     if (days.length === 0) {
         clearCharts();
+        clearTable();
         return;
     }
 
@@ -284,6 +398,7 @@ function render() {
 
     renderHistoryTempChart(points, xDomain);
     renderHistoryRainChart(points, xDomain);
+    renderHistoryTable();
 }
 
 // Guards against an in-flight request resolving after a newer one — the
@@ -293,23 +408,43 @@ function render() {
 // switches the selection again before the first settles.
 let fetchToken = 0;
 
+async function fetchJson(url) {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`Request failed: ${res.status}`);
+    return res.json();
+}
+
 async function fetchHistory() {
     const token = ++fetchToken;
     const { start, end } = currentRange();
+    const isMonthMode = rangeMode === "month";
+    const month = Number(els.monthSelect.value);
     setStatus("Loading history…");
+
+    const historyPromise = fetchJson(`/api/history-range?start=${start}&end=${end}`);
+    // Records are a nice-to-have on top of the main history fetch — a
+    // failure here shouldn't blank out the charts, so it's caught on its
+    // own and just leaves the table's record columns as "–".
+    const recordsPromise = isMonthMode
+        ? fetchJson(`/api/month-records?month=${month}`).catch((err) => {
+              console.error(err);
+              return null;
+          })
+        : Promise.resolve(null);
+
     try {
-        const res = await fetch(`/api/history-range?start=${start}&end=${end}`);
-        if (!res.ok) throw new Error(`Request failed: ${res.status}`);
-        const data = await res.json();
-        if (!data || !Array.isArray(data.days)) throw new Error("Unexpected response shape");
+        const [historyData, recordsData] = await Promise.all([historyPromise, recordsPromise]);
+        if (!historyData || !Array.isArray(historyData.days)) throw new Error("Unexpected response shape");
         if (token !== fetchToken) return;
 
-        days = data.days;
+        days = historyData.days;
+        monthRecords = isMonthMode && recordsData && Array.isArray(recordsData.days) ? recordsData.days : null;
         setStatus(days.length === 0 ? "No data available for this period." : "");
         render();
     } catch (err) {
         if (token !== fetchToken) return;
         days = [];
+        monthRecords = null;
         setStatus("Unable to load history right now.", "error");
         render();
     }

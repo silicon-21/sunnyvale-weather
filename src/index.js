@@ -49,6 +49,10 @@ export default {
             return handleHistoryRange(url.searchParams.get("start"), url.searchParams.get("end"));
         }
 
+        if (url.pathname === "/api/month-records") {
+            return handleMonthRecords(url.searchParams.get("month"));
+        }
+
         return env.ASSETS.fetch(request);
     },
 };
@@ -394,6 +398,86 @@ async function handleHistoryRange(start, end) {
         200,
         { "cache-control": "public, max-age=3600" }
     );
+}
+
+// The spreadsheet's recorded daily history starts in September 2018 — see
+// the matching client-side constant in history.js.
+const EARLIEST_YEAR = 2018;
+
+// Date's month argument is 0-indexed, so passing the 1-indexed `month`
+// itself (not month - 1) rolls over to the next month's day 0 — i.e. this
+// month's last day.
+function daysInMonth(year, month) {
+    return new Date(Date.UTC(year, month, 0)).getUTCDate();
+}
+
+// Per-day temperature/rain records for a given calendar month, across every
+// year the spreadsheet has data for — backs the History tab's monthly table.
+// Queried as one request per year (rather than one big multi-year range)
+// since only ~1/12th of each year's rows are actually wanted.
+async function handleMonthRecords(monthParam) {
+    const month = Number(monthParam);
+    if (!Number.isInteger(month) || month < 1 || month > 12) {
+        return jsonResponse({ error: "month must be an integer from 1 to 12." }, 400);
+    }
+
+    const { year: currentYear } = pacificDateParts(new Date());
+    const years = [];
+    for (let y = EARLIEST_YEAR; y <= currentYear; y++) years.push(y);
+
+    const monthStr = String(month).padStart(2, "0");
+    const results = await Promise.all(
+        years.map((y) => fetchSheetRows(`${y}-${monthStr}-01`, `${y}-${monthStr}-${String(daysInMonth(y, month)).padStart(2, "0")}`))
+    );
+
+    // Keyed by day-of-month (1-31); tracks the record low/high/precip seen
+    // for that day across every year fetched above, and which year set it.
+    const byDay = new Map();
+    for (let i = 0; i < years.length; i++) {
+        const { rows, error } = results[i];
+        if (error || !rows) continue;
+        const year = years[i];
+
+        for (const row of rows) {
+            const day = Number(row["Date"]?.slice(8, 10));
+            if (!day) continue;
+
+            let entry = byDay.get(day);
+            if (!entry) {
+                entry = {
+                    day,
+                    recordLowF: null,
+                    recordLowYear: null,
+                    recordHighF: null,
+                    recordHighYear: null,
+                    recordPrecipIn: null,
+                    recordPrecipYear: null,
+                };
+                byDay.set(day, entry);
+            }
+
+            const lowF = row["Low Temp (F)"];
+            if (typeof lowF === "number" && (entry.recordLowF === null || lowF < entry.recordLowF)) {
+                entry.recordLowF = lowF;
+                entry.recordLowYear = year;
+            }
+
+            const highF = row["High Temp (F)"];
+            if (typeof highF === "number" && (entry.recordHighF === null || highF > entry.recordHighF)) {
+                entry.recordHighF = highF;
+                entry.recordHighYear = year;
+            }
+
+            const precipIn = row["Precip (in)"];
+            if (typeof precipIn === "number" && (entry.recordPrecipIn === null || precipIn > entry.recordPrecipIn)) {
+                entry.recordPrecipIn = precipIn;
+                entry.recordPrecipYear = year;
+            }
+        }
+    }
+
+    const days = Array.from(byDay.values()).sort((a, b) => a.day - b.day);
+    return jsonResponse({ month, days }, 200, { "cache-control": "public, max-age=3600" });
 }
 
 // NWS's forecast is keyed off a gridpoint resolved from lat/lon, and active

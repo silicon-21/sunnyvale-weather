@@ -776,6 +776,57 @@ body {
     padding-right: 1.3334%;
 }
 
+.history-table-card {
+    margin-top: 16px;
+}
+
+.table-scroll {
+    overflow-x: auto;
+    margin-top: 10px;
+}
+
+.history-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+.history-table th,
+.history-table td {
+    padding: 8px 10px;
+    text-align: right;
+    white-space: nowrap;
+    border-bottom: 1px solid var(--border-hairline);
+}
+
+.history-table th:first-child,
+.history-table td:first-child {
+    text-align: left;
+}
+
+.history-table thead th {
+    color: var(--text-muted);
+    font-weight: 600;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.history-table tbody tr:hover {
+    background: var(--page-plane);
+}
+
+.history-table tfoot td {
+    font-weight: 700;
+    border-top: 2px solid var(--border-strong);
+    border-bottom: none;
+}
+
+.history-table .record-year {
+    color: var(--text-muted);
+    font-size: 11px;
+}
+
 .chart-tooltip {
     position: absolute;
     top: 0;

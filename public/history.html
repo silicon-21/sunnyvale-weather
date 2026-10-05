@@ -70,6 +70,29 @@
                 <div class="chart-xaxis"></div>
             </article>
         </section>
+
+        <section class="chart-card history-table-card" id="history-table-section" hidden>
+            <h2>Monthly Data</h2>
+            <div class="table-scroll">
+                <table class="history-table">
+                    <thead>
+                        <tr>
+                            <th scope="col">Day</th>
+                            <th scope="col">High</th>
+                            <th scope="col">Low</th>
+                            <th scope="col">Avg High</th>
+                            <th scope="col">Avg Low</th>
+                            <th scope="col">Record High</th>
+                            <th scope="col">Record Low</th>
+                            <th scope="col">Rain</th>
+                            <th scope="col">Record Rain</th>
+                        </tr>
+                    </thead>
+                    <tbody id="history-table-body"></tbody>
+                    <tfoot id="history-table-foot"></tfoot>
+                </table>
+            </div>
+        </section>
     </main>
 
     <script src="chart.js"></script>
