@@ -612,7 +612,7 @@ function updateLastUpdatedLabel() {
 async function fetchCurrent() {
     try {
         const res = await fetch("/api/current");
-        if (!res.ok) throw new Error(`Request failed: ${res.status}`);
+        if (!res.ok) throw new Error(`Request failed: ${res.status} ${res.body}`);
         const data = await res.json();
         // baromrelin is measured by the console itself, so it's still
         // reported even when the console has lost radio contact with the
@@ -639,7 +639,7 @@ async function fetchCurrent() {
 async function fetchHistory() {
     try {
         const res = await fetch("/api/history");
-        if (!res.ok) throw new Error(`Request failed: ${res.status}`);
+        if (!res.ok) throw new Error(`Request failed: ${res.status} ${res.body}`);
         history = await res.json();
     } catch (err) {
         console.error(err);
@@ -651,7 +651,7 @@ async function fetchHistory() {
 async function fetchSeasonRain() {
     try {
         const res = await fetch("/api/season-rain");
-        if (!res.ok) throw new Error(`Request failed: ${res.status}`);
+        if (!res.ok) throw new Error(`Request failed: ${res.status} ${res.body}`);
         seasonRain = await res.json();
     } catch (err) {
         console.error(err);
@@ -664,7 +664,7 @@ async function fetchSeasonRain() {
 async function fetchMonthRain() {
     try {
         const res = await fetch("/api/month-rain");
-        if (!res.ok) throw new Error(`Request failed: ${res.status}`);
+        if (!res.ok) throw new Error(`Request failed: ${res.status} ${res.body}`);
         monthRain = await res.json();
     } catch (err) {
         console.error(err);
@@ -812,7 +812,7 @@ async function fetchDayHistory(dateString) {
     setDateStatus(`Loading ${dateString}…`);
     try {
         const res = await fetch(`/api/history?date=${dateString}`);
-        if (!res.ok) throw new Error(`Request failed: ${res.status}`);
+        if (!res.ok) throw new Error(`Request failed: ${res.status} ${res.body}`);
         const data = await res.json();
         if (chartDate !== dateString) return; // superseded by a newer selection
         dayHistory = data;

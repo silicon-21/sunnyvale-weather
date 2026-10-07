@@ -433,7 +433,7 @@ function render() {
 async function fetchForecast() {
     try {
         const res = await fetch("/api/forecast");
-        if (!res.ok) throw new Error(`Request failed: ${res.status}`);
+        if (!res.ok) throw new Error(`Request failed: ${res.status} ${res.body}`);
         const data = await res.json();
         if (!data || !Array.isArray(data.periods)) throw new Error("Unexpected response shape");
 

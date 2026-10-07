@@ -410,7 +410,7 @@ let fetchToken = 0;
 
 async function fetchJson(url) {
     const res = await fetch(url);
-    if (!res.ok) throw new Error(`Request failed: ${res.status}`);
+    if (!res.ok) throw new Error(`Request failed: ${res.status} ${res.body}`);
     return res.json();
 }
 
