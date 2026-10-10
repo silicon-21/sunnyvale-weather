@@ -6,6 +6,24 @@ This is a website I made to display the data from my backyard weather station in
 
   * A radar loop in the forecast section (or maybe below the dashboard, not sure yet)
   * Need a climatology section + more tables & details per month
+    * Seasonal totals / graphs
+    * Graph for monthly stats in another section
+  * Custom icons for the forecast - use https://www.weather.gov/forecast-icons for full list
+
+Sky cover (the base set, no precip): skc clear, few few clouds, sct partly cloudy, bkn mostly cloudy, ovc overcast — each also has a wind_ variant (e.g. wind_skc) for "and windy."
+
+Precipitation (combine with cloud cover in the real feed, e.g. tsra_sct):
+- ra rain, shra rain showers, hi_shwrs isolated/slight-chance showers
+- sn snow, ra_sn rain/snow mix, snip snow/ice pellets
+- fzra freezing rain, ra_fzra rain + freezing rain, fzra_sn freezing rain/snow
+- ip ice pellets/sleet, raip rain/ice pellets
+- tsra thunderstorms, scttsra scattered thunderstorms, hi_tsra isolated thunderstorms
+
+Severe/hazard: fc funnel cloud, tor tornado, hur_warn/hur_watch hurricane, ts_warn/ts_watch tropical storm, blizzard
+
+Obstructions/extremes: fg fog/mist, du dust/sand, fu smoke, hz haze, hot, cold
+
+Night versions use an n prefix (nbkn)
 
 ### Local development
 
