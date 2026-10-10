@@ -42,6 +42,12 @@ function round(value, places = 1) {
     return Math.round(value * factor) / factor;
 }
 
+// Unlike round(), always pads to the given number of decimal places (e.g.
+// "5.0" not "5") so values don't visually jitter in width between renders.
+function formatFixed(value, places) {
+    return value.toFixed(places);
+}
+
 function rgbToHex([r, g, b]) {
     return `#${[r, g, b].map((v) => v.toString(16).padStart(2, "0")).join("")}`;
 }
@@ -337,7 +343,7 @@ function renderHourlyWindSpeedChart(points, xDomain) {
         series,
         height: 180,
         minZero: true,
-        yFormat: (v) => `${round(v, 0)} ${speedUnit}`,
+        yFormat: (v) => `${formatFixed(v, 1)} ${speedUnit}`,
         yAxisFormat: (v) => `${round(v, 0)}`,
         xAxisFormat: hourAxisLabel,
     });

@@ -462,7 +462,7 @@ function renderWindSpeedChart(points, xDomain) {
         series,
         height: 180,
         minZero: true,
-        yFormat: (v) => `${round(v, 0)} ${speedUnit}`,
+        yFormat: (v) => `${formatFixed(v, 1)} ${speedUnit}`,
         yAxisFormat: (v) => `${round(v, 0)}`,
     });
 }
@@ -529,6 +529,8 @@ function renderRainChart(points, xDomain) {
         minZero: true,
         yFormat: (v) => `${formatFixed(v, places)} ${rainUnit}`,
         yAxisFormat: (v) => formatFixed(v, places),
+        yTickDecimals: places,
+        yTickPreferredStep: useMetric ? 1 : 0.1,
     });
 }
 
@@ -562,6 +564,8 @@ function renderPressureChart(points, xDomain) {
         height: 180,
         yFormat: (v) => `${formatFixed(v, places)} ${pressureUnit}`,
         yAxisFormat: (v) => formatFixed(v, axisPlaces),
+        yTickDecimals: axisPlaces,
+        yTickPreferredStep: useMetric ? 0.5 : 0.05,
     });
 }
 

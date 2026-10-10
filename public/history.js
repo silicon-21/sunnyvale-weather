@@ -39,6 +39,10 @@ function inToMm(inches) {
     return inches * 25.4;
 }
 
+function hpaToInHg(hpa) {
+    return hpa / 33.8639;
+}
+
 // Unlike toFixed() alone, kept as a named helper to match the rest of the
 // app's formatting calls (script.js/forecast.js both have their own copy).
 function formatFixed(value, places) {
@@ -255,6 +259,64 @@ function renderHistoryRainChart(points, xDomain) {
         yFormat: (v) => `${formatFixed(v, places)} ${rainUnit}`,
         xAxisFormat: rangeMode === "year" ? yearAxisLabel : dayAxisLabel,
         tooltipTimeFormat: tooltipDateLabel,
+        yTickDecimals: places,
+        yTickPreferredStep: useMetric ? 1 : 0.1,
+    });
+}
+
+// Pressure and sunshine only render for the year view — a month's worth of
+// daily pressure/sunshine swings isn't informative the way a year's
+// seasonal shape is, and the table already covers the monthly detail.
+function renderHistoryPressureChart(points, xDomain) {
+    const card = chartCard("history-pressure");
+    const pressureUnit = useMetric ? "hPa" : "inHg";
+    const convert = (hpa) => (useMetric ? hpa : hpaToInHg(hpa));
+    const places = useMetric ? 0 : 2;
+    const axisPlaces = useMetric ? 1 : 2;
+    const series = [
+        {
+            color: "var(--text-primary)",
+            label: "Pressure",
+            getValue: (p) => (typeof p.pressureAvgHpa === "number" ? convert(p.pressureAvgHpa) : null),
+        },
+    ];
+    renderTimeChart({
+        wrapEl: card.querySelector(".chart-wrap"),
+        xaxisEl: card.querySelector(".chart-xaxis"),
+        points,
+        xDomain,
+        series,
+        height: 180,
+        yFormat: (v) => `${formatFixed(v, places)} ${pressureUnit}`,
+        yAxisFormat: (v) => formatFixed(v, axisPlaces),
+        xAxisFormat: yearAxisLabel,
+        tooltipTimeFormat: tooltipDateLabel,
+        yTickDecimals: axisPlaces,
+        yTickPreferredStep: useMetric ? 0.5 : 0.05,
+    });
+}
+
+function renderHistorySunshineChart(points, xDomain) {
+    const card = chartCard("history-sunshine");
+    const series = [
+        {
+            color: "var(--accent-sun-core)",
+            label: "Sunshine",
+            area: true,
+            getValue: (p) => (typeof p.sunshineHrs === "number" ? p.sunshineHrs : null),
+        },
+    ];
+    renderTimeChart({
+        wrapEl: card.querySelector(".chart-wrap"),
+        xaxisEl: card.querySelector(".chart-xaxis"),
+        points,
+        xDomain,
+        series,
+        height: 140,
+        minZero: true,
+        yFormat: (v) => `${formatFixed(v, 1)} hrs`,
+        xAxisFormat: yearAxisLabel,
+        tooltipTimeFormat: tooltipDateLabel,
     });
 }
 
@@ -373,6 +435,10 @@ function renderHistoryTable() {
 function render() {
     els.unitToggle.textContent = useMetric ? "°C" : "°F";
 
+    const showYearCharts = rangeMode === "year";
+    chartCard("history-pressure").hidden = !showYearCharts;
+    chartCard("history-sunshine").hidden = !showYearCharts;
+
     if (days.length === 0) {
         clearCharts();
         clearTable();
@@ -388,6 +454,8 @@ function render() {
         avgHighF: d.avgHighF,
         avgMeanF: d.avgMeanF,
         avgLowF: d.avgLowF,
+        pressureAvgHpa: d.pressureAvgHpa,
+        sunshineHrs: d.sunshineHrs,
     }));
     // A single-row month (e.g. viewing the current month on its first day)
     // would otherwise collapse the x-domain to one instant and divide by
@@ -398,6 +466,10 @@ function render() {
 
     renderHistoryTempChart(points, xDomain);
     renderHistoryRainChart(points, xDomain);
+    if (showYearCharts) {
+        renderHistoryPressureChart(points, xDomain);
+        renderHistorySunshineChart(points, xDomain);
+    }
     renderHistoryTable();
 }
 

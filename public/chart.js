@@ -38,10 +38,61 @@ function niceDomain(values, { minZero = false } = {}) {
     return [min - pad, max + pad];
 }
 
-function autoTicks([lo, hi], count) {
+function roundTo(value, decimals) {
+    return Number(value.toFixed(decimals));
+}
+
+function ticksForStep(lo, hi, step, decimals) {
     const ticks = [];
-    for (let i = 0; i <= count; i++) ticks.push(lo + ((hi - lo) * i) / count);
+    const start = Math.ceil((lo - step * 1e-9) / step) * step;
+    for (let v = start; v <= hi + step * 1e-6; v += step) {
+        ticks.push(roundTo(v, decimals));
+    }
     return ticks;
+}
+
+// base, 2*base, 5*base, 10*base, 20*base, 50*base, ... — the standard
+// "nice number" progression, scaled to start at an arbitrary base step
+// instead of 1 (so it can generate either the plain 1-2-5 sequence or a
+// multiples-of-5 family, by passing base=1 or base=5 respectively).
+function* stepSequence(base) {
+    let magnitude = 1;
+    while (true) {
+        for (const m of [1, 2, 5]) yield base * m * magnitude;
+        magnitude *= 10;
+    }
+}
+
+function firstStepAtLeast(sequence, minValue) {
+    for (const step of sequence) {
+        if (step >= minValue - minValue * 1e-9) return step;
+    }
+    return undefined;
+}
+
+const MIN_NICE_TICKS = 3;
+
+// Picks "nice" axis tick values within the domain rather than naively
+// dividing it into equal fractions — the old approach produced labels with
+// implied precision the data doesn't have (e.g. a ~11.2-wide step rounding
+// to "11, 22, 34, 45"). Tries `preferredStep` (and its round multiples)
+// first, and only falls back to a finer plain 1-2-5 progression when the
+// preferred step would leave too few gridlines to usefully fill the
+// chart's vertical space. `decimals` caps how fine a tick value may ever
+// be (0 = integers only).
+function niceTicks([lo, hi], { targetCount = 4, decimals = 0, preferredStep = 5 } = {}) {
+    if (!(hi > lo)) return [roundTo(lo, decimals)];
+    const minStep = Math.pow(10, -decimals);
+    const rawStep = (hi - lo) / targetCount;
+
+    const preferred = firstStepAtLeast(stepSequence(preferredStep), rawStep);
+    if (preferred !== undefined) {
+        const ticks = ticksForStep(lo, hi, preferred, decimals);
+        if (ticks.length >= MIN_NICE_TICKS) return ticks;
+    }
+
+    const fine = firstStepAtLeast(stepSequence(minStep), rawStep);
+    return ticksForStep(lo, hi, fine, decimals);
 }
 
 // Five labels under the plot, evenly spaced at X_TICK_FRACTIONS. Defaults to
@@ -59,6 +110,44 @@ function renderXAxisLabels(xaxisEl, xDomain, xAxisFormat) {
         span.textContent = label;
         xaxisEl.appendChild(span);
     }
+}
+
+// Scatter dots render as an <ellipse> rather than a <circle> because the
+// chart's viewBox is stretched non-uniformly to fill its container
+// (preserveAspectRatio="none" — see the file header), so a fixed r would
+// come out taller than wide (or vice versa) whenever the container's aspect
+// ratio departs from the viewBox's, which is common on narrow/mobile
+// widths. Measuring the SVG's actual rendered box lets us pick per-axis
+// radii that land back on a true circle in screen pixels.
+const SCATTER_DOT_R_PX = 2.4;
+
+function scatterDotRadii(svg, viewBoxHeight) {
+    const rect = svg.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return { rx: SCATTER_DOT_R_PX, ry: SCATTER_DOT_R_PX };
+    return {
+        rx: SCATTER_DOT_R_PX / (rect.width / CHART_W),
+        ry: SCATTER_DOT_R_PX / (rect.height / viewBoxHeight),
+    };
+}
+
+// Keeps scatter dots circular across resizes (e.g. a phone rotation) by
+// re-measuring the SVG and correcting already-rendered dots in place,
+// rather than requiring a full chart re-render. Bound once per chart, like
+// ensureChartHover.
+function ensureScatterResize(wrapEl) {
+    if (wrapEl.dataset.resizeBound) return;
+    wrapEl.dataset.resizeBound = "1";
+    const svg = wrapEl.querySelector(".chart-svg");
+    const ro = new ResizeObserver(() => {
+        const state = wrapEl._chartState;
+        if (!state) return;
+        const { rx, ry } = scatterDotRadii(svg, state.height);
+        for (const dot of svg.querySelectorAll(".chart-scatter-dot")) {
+            dot.setAttribute("rx", rx);
+            dot.setAttribute("ry", ry);
+        }
+    });
+    ro.observe(svg);
 }
 
 // Hover/touch crosshair + tooltip, bound once per chart and driven off
@@ -185,6 +274,8 @@ function renderTimeChart({
     mode = "line",
     yDomain: yDomainOverride,
     yTicks: yTicksOverride,
+    yTickDecimals = 0,
+    yTickPreferredStep = 5,
     minZero = false,
 }) {
     const svg = wrapEl.querySelector(".chart-svg");
@@ -208,7 +299,12 @@ function renderTimeChart({
         svg.appendChild(svgEl("line", { x1: x, x2: x, y1: plotTop, y2: plotBottom, class: "chart-grid-line" }));
     }
 
-    const yTicks = yTicksOverride ?? autoTicks(yDomain, 4).map((v) => ({ value: v, label: axisFormat(v) }));
+    const yTicks =
+        yTicksOverride ??
+        niceTicks(yDomain, { targetCount: 4, decimals: yTickDecimals, preferredStep: yTickPreferredStep }).map((v) => ({
+            value: v,
+            label: axisFormat(v),
+        }));
     for (const tick of yTicks) {
         const y = scaleY(tick.value);
         svg.appendChild(svgEl("line", { x1: plotLeft, x2: plotRight, y1: y, y2: y, class: "chart-grid-line" }));
@@ -225,8 +321,9 @@ function renderTimeChart({
         if (pts.length === 0) continue;
 
         if (seriesMode === "scatter") {
+            const { rx, ry } = scatterDotRadii(svg, height);
             for (const p of pts) {
-                const dot = svgEl("circle", { cx: scaleX(p.t), cy: scaleY(p.v), r: 2.4, class: "chart-scatter-dot" });
+                const dot = svgEl("ellipse", { cx: scaleX(p.t), cy: scaleY(p.v), rx, ry, class: "chart-scatter-dot" });
                 dot.style.fill = s.color;
                 svg.appendChild(dot);
             }
@@ -281,8 +378,9 @@ function renderTimeChart({
     });
     svg.appendChild(crosshair);
 
-    wrapEl._chartState = { xDomain, points, series, scaleX, yFormat, tooltipTimeFormat, crosshair, plotLeft, plotRight };
+    wrapEl._chartState = { xDomain, points, series, scaleX, yFormat, tooltipTimeFormat, crosshair, plotLeft, plotRight, height };
     ensureChartHover(wrapEl);
+    ensureScatterResize(wrapEl);
 
     renderXAxisLabels(xaxisEl, xDomain, xAxisFormat);
 }
