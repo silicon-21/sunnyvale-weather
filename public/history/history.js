@@ -31,58 +31,8 @@ let days = [];
 // table doesn't show. Keyed by day-of-month via recordsByDay() below.
 let monthRecords = null;
 
-function fToC(f) {
-    return (f - 32) * (5 / 9);
-}
-
-function inToMm(inches) {
-    return inches * 25.4;
-}
-
-function hpaToInHg(hpa) {
-    return hpa / 33.8639;
-}
-
-// Unlike toFixed() alone, kept as a named helper to match the rest of the
-// app's formatting calls (script.js/forecast.js both have their own copy).
-function formatFixed(value, places) {
-    return value.toFixed(places);
-}
-
 function pad2(n) {
     return String(n).padStart(2, "0");
-}
-
-const pacificPartsFmt = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/Los_Angeles",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-});
-function pacificToday() {
-    const parts = pacificPartsFmt.formatToParts(new Date());
-    const get = (type) => Number(parts.find((p) => p.type === type).value);
-    return { year: get("year"), month: get("month"), day: get("day") };
-}
-
-// Date's month argument is 0-indexed, so passing the 1-indexed `month`
-// itself (not month - 1) rolls over to the next month's day 0 — i.e. this
-// month's last day.
-function daysInMonth(year, month) {
-    return new Date(Date.UTC(year, month, 0)).getUTCDate();
-}
-
-function setStatus(text, state) {
-    els.statusLine.textContent = text;
-    if (state) {
-        els.statusLine.setAttribute("data-state", state);
-    } else {
-        els.statusLine.removeAttribute("data-state");
-    }
-}
-
-function chartCard(name) {
-    return document.querySelector(`.chart-card[data-chart="${name}"]`);
 }
 
 function populateSelects() {

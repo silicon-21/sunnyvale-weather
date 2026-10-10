@@ -17,18 +17,6 @@ const PRESSURE_TICK_DEGS = [-150, -75, 0, 75, 150];
 // scaled against a typical clear-sky peak.
 const SOLAR_MAX_WM2 = 1000;
 
-// Temperature ring color, interpolated between stops (always keyed on raw °F
-// so it doesn't shift when the unit toggle flips to Celsius).
-const TEMP_COLOR_STOPS = [
-    [15, [28, 92, 171]], // deep blue
-    [30, [57, 135, 229]], // blue
-    [45, [27, 175, 122]], // teal green
-    [60, [252, 236, 3]], // yellow
-    [75, [237, 161, 0]], // amber
-    [90, [208, 59, 59]], // red
-    [105, [181, 0, 131]], // magenta
-];
-
 const els = {
     statusLine: document.getElementById("status-line"),
     lastUpdated: document.getElementById("last-updated"),
@@ -63,62 +51,6 @@ let monthRain = null;
 // otherwise a "YYYY-MM-DD" Pacific date string, backed by `dayHistory`.
 let chartDate = null;
 let dayHistory = null;
-
-function fToC(f) {
-    return (f - 32) * (5 / 9);
-}
-
-function inHgToHpa(inHg) {
-    return inHg * 33.8639;
-}
-
-function inToMm(inches) {
-    return inches * 25.4;
-}
-
-function mphToKmh(mph) {
-    return mph * 1.60934;
-}
-
-function round(value, places = 1) {
-    const factor = 10 ** places;
-    return Math.round(value * factor) / factor;
-}
-
-// Unlike round(), always pads to the given number of decimal places (e.g.
-// "5.0" not "5") so values don't visually jitter in width between renders.
-function formatFixed(value, places) {
-    return value.toFixed(places);
-}
-
-function rgbToHex([r, g, b]) {
-    return `#${[r, g, b].map((v) => v.toString(16).padStart(2, "0")).join("")}`;
-}
-
-function tempColor(tempF) {
-    const stops = TEMP_COLOR_STOPS;
-    if (tempF <= stops[0][0]) return rgbToHex(stops[0][1]);
-    if (tempF >= stops[stops.length - 1][0]) return rgbToHex(stops[stops.length - 1][1]);
-
-    for (let i = 0; i < stops.length - 1; i++) {
-        const [t0, c0] = stops[i];
-        const [t1, c1] = stops[i + 1];
-        if (tempF >= t0 && tempF <= t1) {
-            const t = (tempF - t0) / (t1 - t0);
-            const rgb = c0.map((v, idx) => Math.round(v + (c1[idx] - v) * t));
-            return rgbToHex(rgb);
-        }
-    }
-}
-
-function setStatus(text, state) {
-    els.statusLine.textContent = text;
-    if (state) {
-        els.statusLine.setAttribute("data-state", state);
-    } else {
-        els.statusLine.removeAttribute("data-state");
-    }
-}
 
 function render() {
     const tempUnit = useMetric ? "°C" : "°F";
@@ -370,10 +302,6 @@ function renderSolar() {
 // response) and read from the same `points` array, so a single generic
 // renderer + hover/tooltip handler (both in chart.js, shared with the
 // forecast page's hourly charts) covers all of them.
-
-function chartCard(name) {
-    return document.querySelector(`.chart-card[data-chart="${name}"]`);
-}
 
 function clearAllCharts() {
     for (const svg of document.querySelectorAll(".chart-svg")) {
@@ -684,24 +612,6 @@ async function fetchMonthRain() {
 // `dayHistory`, independent of the live `history` object `fetchHistory()`
 // keeps refreshing; `renderCharts()` picks between them off `chartDate`.
 
-function pacificDateParts(date) {
-    const parts = new Intl.DateTimeFormat("en-US", {
-        timeZone: "America/Los_Angeles",
-        year: "numeric",
-        month: "numeric",
-        day: "numeric",
-    }).formatToParts(date);
-    const get = (type) => Number(parts.find((p) => p.type === type).value);
-    return { year: get("year"), month: get("month"), day: get("day") };
-}
-
-function daysInMonth(year, month) {
-    // Date's month argument is 0-indexed, so passing the 1-indexed `month`
-    // straight through points at the *next* month — day 0 of that rolls
-    // back to the last day of the month actually being asked about.
-    return new Date(Date.UTC(year, month, 0)).getUTCDate();
-}
-
 // Normalizes via a Date object (so an out-of-range day/month, like day 0 or
 // day 35, rolls over to the calendar date it actually means) before clamping
 // to today — the day <select>'s own options are always valid, but this
@@ -711,7 +621,7 @@ function clampToToday(year, month, day) {
     const normalized = new Date(Date.UTC(year, month - 1, day, 12));
     const n = { year: normalized.getUTCFullYear(), month: normalized.getUTCMonth() + 1, day: normalized.getUTCDate() };
 
-    const today = pacificDateParts(new Date());
+    const today = pacificToday();
     const pastToday =
         n.year > today.year ||
         (n.year === today.year && n.month > today.month) ||
@@ -726,7 +636,7 @@ const DATE_MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug"
 // than silently failing to select an out-of-range year.
 function ensureYearOption(year) {
     if ([...els.dateYear.options].some((o) => Number(o.value) === year)) return;
-    const today = pacificDateParts(new Date());
+    const today = pacificToday();
     const minYear = Math.min(year, today.year - 10);
     els.dateYear.innerHTML = "";
     for (let y = today.year; y >= minYear; y--) {
@@ -781,7 +691,7 @@ function applyDateChange(year, month, day) {
     const clamped = clampToToday(year, month, day);
     setDateControls(clamped.year, clamped.month, clamped.day);
 
-    const today = pacificDateParts(new Date());
+    const today = pacificToday();
     const isToday = clamped.year === today.year && clamped.month === today.month && clamped.day === today.day;
     els.dateNext.disabled = isToday;
     els.dateToday.disabled = isToday;
@@ -808,7 +718,7 @@ function shiftChartDate(deltaDays) {
 }
 
 function goToToday() {
-    const today = pacificDateParts(new Date());
+    const today = pacificToday();
     applyDateChange(today.year, today.month, today.day);
 }
 
@@ -832,7 +742,7 @@ async function fetchDayHistory(dateString) {
 }
 
 function initDateNav() {
-    const today = pacificDateParts(new Date());
+    const today = pacificToday();
 
     DATE_MONTH_NAMES.forEach((name, i) => {
         const opt = document.createElement("option");

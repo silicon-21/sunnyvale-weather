@@ -21,6 +21,12 @@ const STATION_LON = -122.0363;
 // individual.
 const NWS_USER_AGENT = "sunnyvale-weather-dashboard (Cloudflare Worker)";
 
+const PAGE_ASSET_PATHS = {
+    "/": "/dashboard/",
+    "/forecast": "/forecast/",
+    "/history": "/history/",
+};
+
 export default {
     async fetch(request, env) {
         const url = new URL(request.url);
@@ -51,6 +57,18 @@ export default {
 
         if (url.pathname === "/api/month-records") {
             return handleMonthRecords(url.searchParams.get("month"));
+        }
+
+        // Each page's HTML lives under its own folder (public/<page>/index.html)
+        // for organization, but keeps its original clean URL — mapped
+        // explicitly here rather than relying on the assets binding's own
+        // clean-URL/trailing-slash handling, so moving files around never
+        // risks changing a URL anyone's linked to or bookmarked.
+        const pageAsset = PAGE_ASSET_PATHS[url.pathname];
+        if (pageAsset) {
+            const assetUrl = new URL(request.url);
+            assetUrl.pathname = pageAsset;
+            return env.ASSETS.fetch(new Request(assetUrl, request));
         }
 
         return env.ASSETS.fetch(request);

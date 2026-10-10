@@ -1,17 +1,5 @@
 const REFRESH_INTERVAL_MS = 10 * 60_000;
 
-// Same stops as the dashboard's temperature ring, so a forecast high reads
-// as the same color a live reading of that temperature would.
-const TEMP_COLOR_STOPS = [
-    [15, [28, 92, 171]], // deep blue
-    [30, [57, 135, 229]], // blue
-    [45, [27, 175, 122]], // teal green
-    [60, [252, 236, 3]], // yellow
-    [75, [237, 161, 0]], // amber
-    [90, [208, 59, 59]], // red
-    [105, [181, 0, 131]], // magenta
-];
-
 const els = {
     statusLine: document.getElementById("status-line"),
     lastUpdated: document.getElementById("last-updated"),
@@ -32,50 +20,6 @@ let forecast = null;
 // "YYYY-MM-DD" key from groupPeriodsByDay, null until the first fetch picks
 // the first group as the default.
 let selectedDayKey = null;
-
-function fToC(f) {
-    return (f - 32) * (5 / 9);
-}
-
-function round(value, places = 1) {
-    const factor = 10 ** places;
-    return Math.round(value * factor) / factor;
-}
-
-// Unlike round(), always pads to the given number of decimal places (e.g.
-// "5.0" not "5") so values don't visually jitter in width between renders.
-function formatFixed(value, places) {
-    return value.toFixed(places);
-}
-
-function rgbToHex([r, g, b]) {
-    return `#${[r, g, b].map((v) => v.toString(16).padStart(2, "0")).join("")}`;
-}
-
-function tempColor(tempF) {
-    const stops = TEMP_COLOR_STOPS;
-    if (tempF <= stops[0][0]) return rgbToHex(stops[0][1]);
-    if (tempF >= stops[stops.length - 1][0]) return rgbToHex(stops[stops.length - 1][1]);
-
-    for (let i = 0; i < stops.length - 1; i++) {
-        const [t0, c0] = stops[i];
-        const [t1, c1] = stops[i + 1];
-        if (tempF >= t0 && tempF <= t1) {
-            const t = (tempF - t0) / (t1 - t0);
-            const rgb = c0.map((v, idx) => Math.round(v + (c1[idx] - v) * t));
-            return rgbToHex(rgb);
-        }
-    }
-}
-
-function setStatus(text, state) {
-    els.statusLine.textContent = text;
-    if (state) {
-        els.statusLine.setAttribute("data-state", state);
-    } else {
-        els.statusLine.removeAttribute("data-state");
-    }
-}
 
 function formatAgo(ms) {
     const seconds = Math.round(ms / 1000);
@@ -249,14 +193,6 @@ function renderForecastDetail() {
 
         els.forecastDetail.appendChild(wrap);
     }
-}
-
-function mphToKmh(mph) {
-    return mph * 1.60934;
-}
-
-function chartCard(name) {
-    return document.querySelector(`.chart-card[data-chart="${name}"]`);
 }
 
 // NWS's hourly windSpeed comes as a free-form string ("2 mph", occasionally

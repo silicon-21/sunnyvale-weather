@@ -6,8 +6,8 @@
 // cycle so a slow or failed request there never holds up the banner, and
 // vice versa.
 
-const BANNER_NORMAL_SRC = "banner.jpg";
-const BANNER_HEAT_SRC = "heatabnormal.png";
+const BANNER_NORMAL_SRC = "/shared/banner.jpg";
+const BANNER_HEAT_SRC = "/shared/heatabnormal.png";
 const HEAT_BANNER_THRESHOLD_F = 90;
 const BANNER_POLL_INTERVAL_MS = 60_000;
 const HEAT_ABNORMAL = "https://www.youtube.com/watch?v=b2NTglk9tvI";

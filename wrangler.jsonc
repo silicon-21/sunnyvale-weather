@@ -5,6 +5,12 @@
   "compatibility_date": "2026-09-27",
   "assets": {
     "directory": "./public",
-    "binding": "ASSETS"
+    "binding": "ASSETS",
+    // Routes every request through the Worker first — without this,
+    // Cloudflare's own clean-URL/trailing-slash asset handling intercepts
+    // requests that happen to match a page's own folder (e.g. "/forecast"
+    // matching public/forecast/index.html) before the Worker's explicit
+    // PAGE_ASSET_PATHS routing in src/index.js ever runs.
+    "run_worker_first": true
   }
 }
