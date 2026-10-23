@@ -5,7 +5,7 @@ const SHEET_RAIN_RETRY_DELAY_MS = 30_000;
 
 // Visual scale caps for the rain jars — not measured maxima, just what reads
 // as "nearly full" for a Sunnyvale day/month/season.
-const RAIN_JAR_MAX_IN = { day: 1, month: 6, season: 15 };
+const RAIN_JAR_MAX_IN = { day: 1, month: 3, season: 15 };
 
 // Gauge calibration: needle is vertical at "normal" relative pressure, 90deg
 // of rotation per 1.25 inHg, clamped to +/-150deg so it can't wrap around.
@@ -14,8 +14,8 @@ const PRESSURE_HALF_RANGE_INHG = 1.25;
 const PRESSURE_MAX_ANGLE = 150;
 const PRESSURE_TICK_DEGS = [-150, -75, 0, 75, 150];
 
-// scaled against a typical clear-sky peak.
-const SOLAR_MAX_WM2 = 1000;
+// scaled against the theoretical 
+const SOLAR_MAX_WM2 = 1300;
 
 const els = {
     statusLine: document.getElementById("status-line"),
@@ -248,12 +248,22 @@ function renderPressure(pressureUnit) {
 function renderRain(rainUnit) {
     const tile = els.tiles.rain;
     const jars = tile.querySelectorAll(".jar");
+    const hasRate = typeof latest?.hourlyrainin === "number";
     const hasDaily = typeof latest?.dailyrainin === "number";
 
-    if (hasDaily) {
-        setJar(jars[0], latest.dailyrainin, RAIN_JAR_MAX_IN.day, rainUnit);
+    // Rate shares the day jar's scale (RAIN_JAR_MAX_IN.day) rather than its
+    // own — it's a glance comparison against the day total sitting right
+    // next to it, not an independently-calibrated gauge.
+    if (hasRate) {
+        setJar(jars[0], latest.hourlyrainin, RAIN_JAR_MAX_IN.day, `${rainUnit}/hr`);
     } else {
         clearJar(jars[0]);
+    }
+
+    if (hasDaily) {
+        setJar(jars[1], latest.dailyrainin, RAIN_JAR_MAX_IN.day, rainUnit);
+    } else {
+        clearJar(jars[1]);
     }
 
     // Month total = spreadsheet sum through yesterday + today's live station
@@ -263,11 +273,12 @@ function renderRain(rainUnit) {
     // when the live reading is unavailable, rather than blocking the whole
     // jar on it.
     if (monthRain && typeof monthRain.monthToYesterdayIn === "number") {
-        setJar(jars[1], monthRain.monthToYesterdayIn + (hasDaily ? latest.dailyrainin : 0), RAIN_JAR_MAX_IN.month, rainUnit);
+        setJar(jars[2], monthRain.monthToYesterdayIn + (hasDaily ? latest.dailyrainin : 0), RAIN_JAR_MAX_IN.month, rainUnit);
     }
 
-    if (seasonRain && typeof seasonRain.seasonRainIn === "number") {
-        setJar(jars[2], seasonRain.seasonRainIn, RAIN_JAR_MAX_IN.season, rainUnit);
+    // Same split as the month total, for the same reason.
+    if (seasonRain && typeof seasonRain.seasonToYesterdayIn === "number") {
+        setJar(jars[3], seasonRain.seasonToYesterdayIn + (hasDaily ? latest.dailyrainin : 0), RAIN_JAR_MAX_IN.season, rainUnit);
     }
 }
 
@@ -276,12 +287,15 @@ function clearJar(jarEl) {
     jarEl.querySelector(".jar-value").textContent = "–";
 }
 
-function setJar(jarEl, amountIn, maxIn, rainUnit) {
+function setJar(jarEl, amountIn, maxIn, unitLabel) {
     const amount = useMetric ? inToMm(amountIn) : amountIn;
-    const fillPercent = clamp((amountIn / maxIn) * 100, 4, 100);
+    // No floor here (unlike clearJar's 4% "no data" sentinel) — a confirmed
+    // zero should read as an empty jar, not a mystery sliver indistinguishable
+    // from a small-but-real amount.
+    const fillPercent = clamp((amountIn / maxIn) * 100, 0, 100);
 
     jarEl.querySelector(".jar-fill").style.setProperty("--fill", `${fillPercent}%`);
-    jarEl.querySelector(".jar-value").textContent = `${formatFixed(amount, useMetric ? 1 : 2)} ${rainUnit}`;
+    jarEl.querySelector(".jar-value").textContent = `${formatFixed(amount, useMetric ? 1 : 2)} ${unitLabel}`;
 }
 
 function renderSolar() {

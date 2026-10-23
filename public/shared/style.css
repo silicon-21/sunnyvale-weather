@@ -531,7 +531,6 @@ body {
 .jar-fill {
     width: 100%;
     height: var(--fill, 4%);
-    min-height: 4%;
     background: var(--accent-rain);
     transition: height 0.4s;
 }

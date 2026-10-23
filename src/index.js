@@ -13,8 +13,8 @@ const SHEETS_API_URL =
 // Approximate station location, used only to resolve the NWS forecast
 // gridpoint and active alerts — the National Weather Service's grid
 // resolution (~2.5km) makes a precise rooftop coordinate unnecessary.
-const STATION_LAT = 37.3688;
-const STATION_LON = -122.0363;
+const STATION_LAT = 37.3606;
+const STATION_LON = -122.0520;
 
 // api.weather.gov asks every client to identify itself in the User-Agent
 // (no API key is used). This is a generic app identifier, not tied to any
@@ -334,16 +334,25 @@ function tempRange(rows) {
     return { high, low };
 }
 
-// Season-to-date rain, summed from the spreadsheet — Ambient Weather's device
+// Season-to-date rain, summed from the spreadsheet through *yesterday* — the
+// client combines this with today's live station reading, same split (and
+// same reason: the spreadsheet and station occasionally disagree on today's
+// still-in-progress numbers) as handleMonthRain. Ambient Weather's device
 // only tracks day/week/month/year/total rain, nothing season-scoped.
 async function handleSeasonRain() {
-    const startDate = getRainSeasonStart(new Date());
+    const now = new Date();
+    const seasonStart = getRainSeasonStart(now);
+    const yesterday = pacificDateString(new Date(now.getTime() - 24 * 60 * 60 * 1000));
 
-    const { rows, error } = await fetchSheetRows(startDate);
+    if (yesterday < seasonStart) {
+        return jsonResponse({ seasonToYesterdayIn: 0, seasonStart }, 200, { "cache-control": "public, max-age=3600" });
+    }
+
+    const { rows, error } = await fetchSheetRows(seasonStart, yesterday);
     if (error) return jsonResponse({ error }, 502);
 
     return jsonResponse(
-        { seasonRainIn: sumPrecip(rows), seasonStart: startDate },
+        { seasonToYesterdayIn: sumPrecip(rows), seasonStart },
         200,
         { "cache-control": "public, max-age=3600" }
     );
