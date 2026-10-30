@@ -27,6 +27,24 @@ const PAGE_ASSET_PATHS = {
     "/history": "/history/",
 };
 
+// The Ambient Weather console was replaced on 2023-12-20 without
+// recalibrating its sea-level pressure offset for the station's ~40m
+// elevation, so every relative-pressure (baromrelin, and the spreadsheet's
+// derived hPa columns) reading since then reads gauge pressure rather than
+// true sea-level pressure. This factor is multiplicative, so it's the same
+// whether applied in inHg or hPa, and is applied to every observation dated
+// after the swap until the console itself is recalibrated.
+const PRESSURE_CORRECTION_FACTOR = 1.0064016173;
+const PRESSURE_CORRECTION_CUTOFF_DATE = "2023-12-20";
+const PRESSURE_CORRECTION_CUTOFF_MS = pacificDayBoundsMs(parsePacificDateString(PRESSURE_CORRECTION_CUTOFF_DATE)).dayEndMs;
+
+// `dateString` is a "YYYY-MM-DD" spreadsheet date; lexicographic comparison
+// works directly on that format.
+function correctPressure(value, dateString) {
+    if (typeof value !== "number") return value;
+    return dateString > PRESSURE_CORRECTION_CUTOFF_DATE ? value * PRESSURE_CORRECTION_FACTOR : value;
+}
+
 export default {
     async fetch(request, env) {
         const url = new URL(request.url);
@@ -114,7 +132,14 @@ async function handleCurrent(env) {
         return jsonResponse({ error: "No data returned for this station." }, 502);
     }
 
-    return jsonResponse(device.lastData, 200, { "cache-control": "public, max-age=30" });
+    // The live reading is always "now," which is always after the
+    // uncalibrated-console cutoff, so it's always corrected.
+    const lastData =
+        typeof device.lastData.baromrelin === "number"
+            ? { ...device.lastData, baromrelin: device.lastData.baromrelin * PRESSURE_CORRECTION_FACTOR }
+            : device.lastData;
+
+    return jsonResponse(lastData, 200, { "cache-control": "public, max-age=30" });
 }
 
 // Today's high/low and the "from yesterday" comparison, both derived from a
@@ -203,7 +228,10 @@ async function handleHistory(env, requestedDate) {
             winddir: r.winddir,
             dailyrainin: r.dailyrainin,
             hourlyrainin: r.hourlyrainin,
-            baromrelin: r.baromrelin,
+            baromrelin:
+                typeof r.baromrelin === "number" && r.dateutc >= PRESSURE_CORRECTION_CUTOFF_MS
+                    ? r.baromrelin * PRESSURE_CORRECTION_FACTOR
+                    : r.baromrelin,
             solarradiation: r.solarradiation,
         });
     }
@@ -420,9 +448,18 @@ async function handleHistoryRange(start, end) {
                 avgHighF: typeof row["Avg High Temp (F)"] === "number" ? row["Avg High Temp (F)"] : null,
                 avgMeanF: typeof row["Avg Daily Mean(F)"] === "number" ? row["Avg Daily Mean(F)"] : null,
                 avgLowF: typeof row["Avg Low Temp (F)"] === "number" ? row["Avg Low Temp (F)"] : null,
-                pressureHighHpa: typeof row["Pressure High (hPa)"] === "number" ? row["Pressure High (hPa)"] : null,
-                pressureAvgHpa: typeof row["Pressure Avg"] === "number" ? row["Pressure Avg"] : null,
-                pressureLowHpa: typeof row["Pressure Low"] === "number" ? row["Pressure Low"] : null,
+                pressureHighHpa: correctPressure(
+                    typeof row["Pressure High (hPa)"] === "number" ? row["Pressure High (hPa)"] : null,
+                    row["Date"]
+                ),
+                pressureAvgHpa: correctPressure(
+                    typeof row["Pressure Avg"] === "number" ? row["Pressure Avg"] : null,
+                    row["Date"]
+                ),
+                pressureLowHpa: correctPressure(
+                    typeof row["Pressure Low"] === "number" ? row["Pressure Low"] : null,
+                    row["Date"]
+                ),
                 sunshineHrs: typeof row["Sunshine Hrs"] === "number" ? row["Sunshine Hrs"] : null,
             })),
         },
