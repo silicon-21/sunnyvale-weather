@@ -24,6 +24,7 @@ const els = {
     refreshButton: document.getElementById("refresh-button"),
     dateStatus: document.getElementById("date-status"),
     datePrev: document.getElementById("date-prev"),
+    dateGo: document.getElementById("date-go"),
     dateNext: document.getElementById("date-next"),
     dateToday: document.getElementById("date-today"),
     dateMonth: document.getElementById("date-month"),
@@ -697,6 +698,17 @@ function setDateStatus(text, state) {
     }
 }
 
+// Keeps the controls themselves correct as the user adjusts them — clamping
+// an out-of-range day/month/year and refreshing the day <select>'s options
+// to match the chosen month — without fetching or touching chartDate. Used
+// by the selects' own change handlers, so picking through month/day/year
+// doesn't fire a request per click; the Go button (or Prev/Next/Today, which
+// act immediately like before) is what actually applies the selection.
+function syncDateControls(year, month, day) {
+    const clamped = clampToToday(year, month, day);
+    setDateControls(clamped.year, clamped.month, clamped.day);
+}
+
 function applyDateChange(year, month, day) {
     // Re-validate/re-sync the controls every time (not just on direct
     // input) since a day that was valid for the old month/year — or past
@@ -779,10 +791,14 @@ function initDateNav() {
     els.datePrev.addEventListener("click", () => shiftChartDate(-1));
     els.dateNext.addEventListener("click", () => shiftChartDate(1));
     els.dateToday.addEventListener("click", goToToday);
+    els.dateGo.addEventListener("click", () => {
+        const { year, month, day } = selectedDateFromControls();
+        applyDateChange(year, month, day);
+    });
     for (const select of [els.dateYear, els.dateMonth, els.dateDay]) {
         select.addEventListener("change", () => {
             const { year, month, day } = selectedDateFromControls();
-            applyDateChange(year, month, day);
+            syncDateControls(year, month, day);
         });
     }
 }

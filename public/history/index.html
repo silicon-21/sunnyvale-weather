@@ -43,6 +43,7 @@
                 <select id="history-month" aria-label="Month"></select>
                 <select id="history-year" aria-label="Year"></select>
             </div>
+            <button id="history-go" class="pill-button" type="button">Go</button>
             <button id="history-next" class="pill-button date-nav-arrow" type="button" aria-label="Next period">&rarr;</button>
         </div>
 
@@ -110,6 +111,67 @@
                     <tfoot id="history-table-foot"></tfoot>
                 </table>
             </div>
+        </section>
+
+        <section class="section-block" id="monthly-section">
+            <h2 class="section-heading">Monthly Averages</h2>
+            <p id="monthly-status-line" class="status-line" role="status"></p>
+
+            <div class="history-controls monthly-range-controls">
+                <div class="date-select">
+                    <select id="monthly-from-month" aria-label="From month"></select>
+                    <select id="monthly-from-year" aria-label="From year"></select>
+                </div>
+                <span class="monthly-range-sep">to</span>
+                <div class="date-select">
+                    <select id="monthly-to-month" aria-label="To month"></select>
+                    <select id="monthly-to-year" aria-label="To year"></select>
+                </div>
+                <button id="monthly-go" class="pill-button" type="button">Go</button>
+            </div>
+
+            <section class="history" id="monthly-charts" aria-live="polite">
+                <article class="chart-card" data-chart="monthly-temp">
+                    <h2>Temperature</h2>
+                    <div class="chart-legend">
+                        <span class="legend-item"><span class="legend-swatch" style="--swatch: var(--chart-red)"></span>High</span>
+                        <span class="legend-item"><span class="legend-swatch" style="--swatch: var(--chart-secondary)"></span>Mean</span>
+                        <span class="legend-item"><span class="legend-swatch" style="--swatch: var(--accent-rain)"></span>Low</span>
+                    </div>
+                    <div class="chart-wrap">
+                        <svg class="chart-svg" preserveAspectRatio="none"></svg>
+                        <div class="chart-tooltip" hidden></div>
+                    </div>
+                    <div class="chart-xaxis"></div>
+                </article>
+
+                <article class="chart-card" data-chart="monthly-pressure">
+                    <h2>Pressure</h2>
+                    <div class="chart-wrap">
+                        <svg class="chart-svg" preserveAspectRatio="none"></svg>
+                        <div class="chart-tooltip" hidden></div>
+                    </div>
+                    <div class="chart-xaxis"></div>
+                </article>
+
+                <article class="chart-card" data-chart="monthly-sunshine">
+                    <h2>Sunshine</h2>
+                    <div class="chart-wrap">
+                        <svg class="chart-svg" preserveAspectRatio="none"></svg>
+                        <div class="chart-tooltip" hidden></div>
+                    </div>
+                    <div class="chart-xaxis"></div>
+                </article>
+
+                <article class="chart-card" data-chart="monthly-rain">
+                    <h2>Precipitation</h2>
+                    <div class="chart-wrap">
+                        <svg class="chart-svg" preserveAspectRatio="none"></svg>
+                        <div class="chart-tooltip" hidden></div>
+                    </div>
+                    <div class="chart-xaxis"></div>
+                </article>
+            </section>
         </section>
     </main>
 
