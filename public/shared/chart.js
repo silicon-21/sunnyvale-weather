@@ -130,11 +130,37 @@ function scatterDotRadii(svg, viewBoxHeight) {
     };
 }
 
-// Keeps scatter dots circular across resizes (e.g. a phone rotation) by
-// re-measuring the SVG and correcting already-rendered dots in place,
-// rather than requiring a full chart re-render. Bound once per chart, like
-// ensureChartHover.
-function ensureScatterResize(wrapEl) {
+// The y-axis tick labels are plain SVG <text>, so the same non-uniform
+// stretch distorts them too — their font comes out taller or shorter than it
+// should (worse the further the chart's rendered aspect ratio departs from
+// its viewBox's, e.g. a short wide card or a tall narrow one). Unlike the
+// scatter dots, a <text> element doesn't have separate x/y "radii" to
+// correct independently, so instead this counter-scales each label
+// vertically, around its own anchor point, by exactly the ratio needed to
+// cancel the viewBox's own vertical-vs-horizontal scale mismatch — leaving
+// the label's rendered size matched to its horizontal (unstretched) scale,
+// same as everything else sized in screen pixels (vector-effect:
+// non-scaling-stroke) rather than viewBox units.
+function axisTextYCorrection(svg, viewBoxHeight) {
+    const rect = svg.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return 1;
+    return (rect.width / CHART_W) / (rect.height / viewBoxHeight);
+}
+
+function correctAxisTextScale(svg, viewBoxHeight) {
+    const correction = axisTextYCorrection(svg, viewBoxHeight);
+    for (const text of svg.querySelectorAll(".chart-axis-text")) {
+        const x = text.getAttribute("x");
+        const y = text.getAttribute("y");
+        text.setAttribute("transform", `translate(${x} ${y}) scale(1 ${correction}) translate(${-x} ${-y})`);
+    }
+}
+
+// Keeps scatter dots circular and axis labels un-stretched across resizes
+// (e.g. a phone rotation) by re-measuring the SVG and correcting the
+// already-rendered elements in place, rather than requiring a full chart
+// re-render. Bound once per chart, like ensureChartHover.
+function ensureChartResize(wrapEl) {
     if (wrapEl.dataset.resizeBound) return;
     wrapEl.dataset.resizeBound = "1";
     const svg = wrapEl.querySelector(".chart-svg");
@@ -146,6 +172,7 @@ function ensureScatterResize(wrapEl) {
             dot.setAttribute("rx", rx);
             dot.setAttribute("ry", ry);
         }
+        correctAxisTextScale(svg, state.height);
     });
     ro.observe(svg);
 }
@@ -280,6 +307,14 @@ function renderTimeChart({
 }) {
     const svg = wrapEl.querySelector(".chart-svg");
     svg.setAttribute("viewBox", `0 0 ${CHART_W} ${height}`);
+    // .chart-wrap's CSS only sets a height as a pre-render fallback — pinning
+    // it to the caller's own `height` here keeps the container in lockstep
+    // with the viewBox's vertical size, so the only non-uniform stretch left
+    // for axisTextYCorrection/scatterDotRadii to correct for is the
+    // responsive *width*, not a height mismatch nobody asked for (a caller
+    // passing a taller `height` now actually renders taller, rather than
+    // silently exaggerating that stretch inside a box that never grew).
+    wrapEl.style.height = `${height}px`;
     while (svg.firstChild) svg.removeChild(svg.firstChild);
 
     const yDomain = yDomainOverride ?? niceDomain(points.flatMap((p) => series.map((s) => s.getValue(p))), { minZero });
@@ -312,6 +347,7 @@ function renderTimeChart({
         text.textContent = tick.label;
         svg.appendChild(text);
     }
+    correctAxisTextScale(svg, height);
 
     for (const s of series) {
         const seriesMode = s.mode ?? mode;
@@ -364,6 +400,7 @@ function renderTimeChart({
         const path = svgEl("path", { d, class: "chart-series-line", "vector-effect": "non-scaling-stroke" });
         path.style.stroke = s.color;
         if (typeof s.opacity === "number") path.style.opacity = s.opacity;
+        if (typeof s.strokeWidth === "number") path.style.strokeWidth = s.strokeWidth;
         svg.appendChild(path);
     }
 
@@ -380,7 +417,7 @@ function renderTimeChart({
 
     wrapEl._chartState = { xDomain, points, series, scaleX, yFormat, tooltipTimeFormat, crosshair, plotLeft, plotRight, height };
     ensureChartHover(wrapEl);
-    ensureScatterResize(wrapEl);
+    ensureChartResize(wrapEl);
 
     renderXAxisLabels(xaxisEl, xDomain, xAxisFormat);
 }

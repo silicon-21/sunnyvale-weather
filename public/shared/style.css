@@ -18,6 +18,11 @@
     --chart-green-light: #7ced48;
     --chart-secondary: #c9830a;
     --chart-tertiary: #7100c7;
+    --chart-teal: #00968a;
+    --chart-pink: #d6448c;
+    --chart-slate: #5b6b82;
+    --chart-brown: #966129;
+    --chart-current-year: #b8860b;
     --chart-grid: var(--border-hairline);
 }
 
@@ -42,6 +47,11 @@
         --chart-green-light: #7ced48;
         --chart-secondary: #e2a53a;
         --chart-tertiary: #7100c7;
+        --chart-teal: #2bb8ab;
+        --chart-pink: #e26aa8;
+        --chart-slate: #8d9cb3;
+        --chart-brown: #c08a4e;
+        --chart-current-year: #ffd60a;
     }
 }
 
@@ -65,6 +75,11 @@
     --chart-green-light: #8fe08f;
     --chart-secondary: #e2a53a;
     --chart-tertiary: #9b7fe0;
+    --chart-teal: #2bb8ab;
+    --chart-pink: #e26aa8;
+    --chart-slate: #8d9cb3;
+    --chart-brown: #c08a4e;
+    --chart-current-year: #ffbb00;
 }
 
 * {
@@ -115,6 +130,7 @@ body {
 
 .top-nav {
     display: flex;
+    flex-wrap: wrap;
     gap: 8px;
     margin-bottom: 20px;
 }

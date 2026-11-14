@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Sunnyvale Weather &ndash; Yearly Comparisons</title>
+    <link rel="stylesheet" href="/shared/style.css" />
+</head>
+
+<body>
+    <div class="banner-wrap">
+        <a class="banner-link" id="banner-link" target="_blank" rel="noopener noreferrer">
+            <img class="banner" id="banner" src="/shared/banner.jpg" alt="Fog over the hills above Sunnyvale" />
+        </a>
+        <h1 class="banner-title">Sunnyvale Weather</h1>
+    </div>
+    <main class="dashboard">
+        <nav class="top-nav" aria-label="Sections">
+            <a class="top-nav-link" href="/">Dashboard</a>
+            <a class="top-nav-link" href="/forecast">Forecast</a>
+            <a class="top-nav-link" href="/history">History</a>
+            <a class="top-nav-link" href="/yearly" aria-current="page">Yearly Comparisons</a>
+        </nav>
+
+        <header class="dashboard-header">
+            <div class="heading">
+                <h2>Yearly Comparisons</h2>
+            </div>
+            <div class="header-controls">
+                <button id="unit-toggle" class="pill-button" type="button" aria-label="Switch units">°F</button>
+            </div>
+        </header>
+
+        <p id="status-line" class="status-line" role="status">Loading full history&hellip;</p>
+
+        <section class="chart-card history-table-card" id="season-rain-table-section">
+            <h2>Season Monthly Rain Totals</h2>
+            <div class="table-scroll">
+                <table class="history-table">
+                    <thead>
+                        <tr>
+                            <th scope="col">Season</th>
+                            <th scope="col">Jul</th>
+                            <th scope="col">Aug</th>
+                            <th scope="col">Sep</th>
+                            <th scope="col">Oct</th>
+                            <th scope="col">Nov</th>
+                            <th scope="col">Dec</th>
+                            <th scope="col">Jan</th>
+                            <th scope="col">Feb</th>
+                            <th scope="col">Mar</th>
+                            <th scope="col">Apr</th>
+                            <th scope="col">May</th>
+                            <th scope="col">Jun</th>
+                            <th scope="col">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody id="season-rain-table-body"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="section-block" id="season-rain-chart-section">
+            <h2 class="section-heading">Season Rainfall Timeseries</h2>
+            <section class="history" id="season-rain-charts">
+                <article class="chart-card" data-chart="season-rain">
+                    <h2>Cumulative Precipitation</h2>
+                    <div class="chart-legend"></div>
+                    <div class="chart-wrap">
+                        <svg class="chart-svg" preserveAspectRatio="none"></svg>
+                        <div class="chart-tooltip" hidden></div>
+                    </div>
+                    <div class="chart-xaxis"></div>
+                </article>
+            </section>
+        </section>
+
+        <section class="section-block" id="yearly-temp-chart-section">
+            <h2 class="section-heading">Yearly Temperature Timeseries</h2>
+            <section class="history" id="yearly-temp-charts">
+                <article class="chart-card" data-chart="yearly-temp">
+                    <h2>Mean Temperature</h2>
+                    <div class="chart-legend"></div>
+                    <div class="chart-wrap">
+                        <svg class="chart-svg" preserveAspectRatio="none"></svg>
+                        <div class="chart-tooltip" hidden></div>
+                    </div>
+                    <div class="chart-xaxis"></div>
+                </article>
+            </section>
+        </section>
+    </main>
+
+    <script src="/shared/helpers.js"></script>
+    <script src="/shared/chart.js"></script>
+    <script src="/shared/banner.js"></script>
+    <script src="/yearly/yearly.js"></script>
+</body>
+
+</html>

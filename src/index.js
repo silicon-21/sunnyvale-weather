@@ -25,6 +25,7 @@ const PAGE_ASSET_PATHS = {
     "/": "/dashboard/",
     "/forecast": "/forecast/",
     "/history": "/history/",
+    "/yearly": "/yearly/",
 };
 
 // The Ambient Weather console was replaced on 2023-12-20 without
